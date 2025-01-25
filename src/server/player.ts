@@ -1,6 +1,6 @@
 import {
     CompressionMethod,
-    type DataPacket,
+    DataPacket,
 	DisconnectMessage,
 	DisconnectPacket,
 	DisconnectReason,
@@ -14,7 +14,7 @@ import {
 	ServerToClientHandshakePacket,
 } from "@serenityjs/protocol";
 import { ClientData } from "../client/client-data";
-import { Logger, Priority, Connection as RakConnection } from "@sanctumterra/raknet";
+import { Frame, Logger, Priority, Connection as RakConnection } from "@sanctumterra/raknet";
 import { createHash, createPublicKey, diffieHellman } from "node:crypto";
 import { sign } from "jsonwebtoken";
 import { decodeLoginJWT, PacketCompressor, type Profile } from "../network";
@@ -24,6 +24,10 @@ import { type ClientOptions, defaultClientOptions, type PacketNames, ProtocolLis
 import type { PlayerEvents } from "./server-options";
 import type { Payload } from "../client/types";
 import { PacketEncryptor } from "../network/packet-encryptor";
+import { ClientCacheStatusPacket } from "../network/client-cache-status";
+
+const SALT = "🧂";
+const SALT_BUFFER = Buffer.from(SALT);
 
 class Player extends Emitter<PlayerEvents> {
 	public server: Server;
@@ -54,38 +58,30 @@ class Player extends Emitter<PlayerEvents> {
 	private prepare() {
 		if (!(this.connection instanceof RakConnection))
 			throw new Error("Connection is not instance of RakConnection");
-		// handle encapsulated packets - This will be converted to Minecraft packets.
-		this.connection.on("encapsulated", (packet: Buffer) => {
-			this.handle(packet);
-		});
-		
-		this.connection.on("disconnect", () => {
-            this.server.onDisconnect(this);
-        });
 
-		// Handle RequestNetworkSettingsPacket - Once to prevent anything from breaking.
+		this.connection.on("encapsulated", this.handle.bind(this));
+		this.connection.on("disconnect", () => this.server.onDisconnect(this));
+
 		this.once("RequestNetworkSettingsPacket", (packet) => {
 			const settings = new NetworkSettingsPacket();
+			const options = this.server.options;
 
-			settings.compressionThreshold = this.server.options.compressionThreshold;
-			settings.compressionMethod = this.server.options.compressionMethod;
+			settings.compressionThreshold = options.compressionThreshold;
+			settings.compressionMethod = options.compressionMethod;
 			settings.clientScalar = 0;
 			settings.clientThrottle = false;
 			settings.clientThreshold = 0;
+			
 			this.send(settings);
 
 			this._compressionEnabled = true;
-			this.options.compressionMethod = this.server.options.compressionMethod;
-			this.options.compressionLevel = this.server.options.compressionLevel;
-			this.options.compressionThreshold =
-			this.server.options.compressionThreshold;
+			this.options.compressionMethod = options.compressionMethod;
+			this.options.compressionLevel = options.compressionLevel;
+			this.options.compressionThreshold = options.compressionThreshold;
 		});
 
-		// Handle Login Packet - Once to prevent anything from breaking.
 		this.once("LoginPacket", (packet) => {
-			const tokens = packet.tokens;
-			const { key, data, skin } = decodeLoginJWT(tokens);
-
+			const { key, data, skin } = decodeLoginJWT(packet.tokens);
 			const extraData = (data as { extraData: object }).extraData as {
 				displayName: string;
 				identity: string;
@@ -113,16 +109,15 @@ class Player extends Emitter<PlayerEvents> {
 				pubKeyDer,
 			);
 
-			const SALT = "🧂";
-			const secretHash = createHash("sha256");
-			secretHash.update(SALT);
-			secretHash.update(this.data.sharedSecret);
+			const secretHash = createHash("sha256")
+				.update(SALT_BUFFER)
+				.update(this.data.sharedSecret);
 			this.secretKeyBytes = secretHash.digest();
 
-			// @ts-expect-error This wants a Uint8Array but we have a Buffer
+			// @ts-ignore
 			const token = sign(
 				{
-					salt: toBase64(SALT),
+					salt: SALT_BUFFER.toString("base64"),
 					signedToken: this.data.loginData.clientX509,
 				},
 				this.data.loginData.ecdhKeyPair.privateKey,
@@ -132,72 +127,84 @@ class Player extends Emitter<PlayerEvents> {
 				},
 			);
 
-            const handshake = new ServerToClientHandshakePacket();
+			const handshake = new ServerToClientHandshakePacket();
 			handshake.token = token;
 			this.send(handshake);
 
-            const iv = this.secretKeyBytes.slice(0, 16);
-            this.iv = iv;
+			const iv = this.secretKeyBytes.slice(0, 16);
+			this.iv = iv;
 			this.startEncryption(iv);
 
-            this.emit("login");
+			this.emit("login");
 			Logger.debug(`Enabling Encryption for ${this.profile.name}`);
 		});
 
-		// Handle ClientToServerHandshakePacket - Once to prevent anything from breaking.
-		this.once("ClientToServerHandshakePacket", (packet) => {
-            const playStatus = new PlayStatusPacket();
-            playStatus.status = PlayStatus.LoginSuccess;
-            this.send(playStatus);
-        });
+		this.once("ClientToServerHandshakePacket", () => {
+			const playStatus = new PlayStatusPacket();
+			playStatus.status = PlayStatus.LoginSuccess;
+			this.send(playStatus);
+		});
 	}
 
     public startEncryption(iv: Buffer) {
-        if(this.packetEncryptor) throw new Error("Packet Encryptor already exists");
-        this.packetEncryptor = new PacketEncryptor(this, iv);
-        this._encryptionEnabled = true;
+        if (!this.packetEncryptor) {
+            this.packetEncryptor = new PacketEncryptor(this, iv);
+            this._encryptionEnabled = true;
+        }
     }
 
-    private sendPacket(packet: DataPacket, priority: Priority = Priority.Normal) { 
-        const serialized = packet.serialize();
+    public sendPacket(packet: DataPacket | Buffer, priority: Priority = Priority.Normal) {
+        const serialized = packet instanceof DataPacket ? packet.serialize() : packet;
         const compressed = this.packetCompressor.compress(
-            serialized, 
+            serialized,
             this.options.compressionMethod
         );
 
-        this.connection.frameAndSend(compressed, priority);
+        const frame = new Frame();
+        frame.orderChannel = 0;
+        frame.payload = compressed;
+        this.connection.sendFrame(frame, priority);
     }
 
-    public send(packet: DataPacket) {
+    public send(packet: DataPacket | Buffer) {
         this.sendPacket(packet, Priority.Immediate);
     }
 
-    public queue(packet: DataPacket) {
+    public queue(packet: DataPacket | Buffer) {
         this.sendPacket(packet, Priority.Normal);
     }
 
-	public processPacket(packets: Buffer[]) {
-        for(const packet of packets) {
-            const id = getPacketId(packet);
-            if (!Packets[id]) {
-                console.log("Received Unknown Packet", id);
-                return;
-            }
-            const Class = Packets[id];
-            const instance = new Class(packet);
-			instance.deserialize();
-            Logger.info(Class.name as PacketNames)
-            this.emit(Class.name as PacketNames, instance);
-
-            if (this.hasListeners("packet")) {
-                this.emit("packet", instance);
-            }
+    public processPacket(packet: Buffer) {
+        const id = getPacketId(packet);
+        if ((id as number) === 129) {
+            const instance = new ClientCacheStatusPacket(packet);
+            instance.deserialize();
+            this.emit("ClientCacheStatusPacket", instance);
+            return;
         }
-	}
+
+        const PacketClass = Packets[id];
+        if (!PacketClass) {
+            Logger.debug(`Received Unknown Packet: ${id}`);
+            return;
+        }
+
+        const instance = new PacketClass(packet);
+        instance.deserialize();
+
+        const packetName = PacketClass.name as PacketNames;
+        this.emit(packetName, instance);
+
+        if (this.hasListeners("packet")) {
+            this.emit("packet", instance);
+        }
+    }
 
     public handle(packet: Buffer) {
         const packets = this.packetCompressor.decompress(packet);
-        this.processPacket(packets);
+        for (const packet of packets) {
+            this.processPacket(packet);
+        }
     }
 }
 

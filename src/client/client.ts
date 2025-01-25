@@ -1,7 +1,7 @@
 import { Emitter } from "../libs/emitter";
-import { Priority, Client as RaknetClient, Status } from "@sanctumterra/raknet";
+import { Frame, Logger, Priority, Client as RaknetClient, Status } from "@sanctumterra/raknet";
 import { defaultClientOptions, type PacketNames, ProtocolList, type ClientOptions, type ClientEvents } from "./client-options";
-import { Packets, getPacketId, RequestNetworkSettingsPacket,ServerboundLoadingScreenPacketPacket,  PlayStatus, ServerboundLoadingScreenType, SetLocalPlayerAsInitializedPacket, RequestChunkRadiusPacket,  ClientToServerHandshakePacket, ResourcePackResponse, ResourcePackClientResponsePacket, TextPacket, TextPacketType, type StartGamePacket, type DataPacket, type ResourcePackStackPacket, type PlayStatusPacket, type ResourcePacksInfoPacket } from "@serenityjs/protocol";
+import { Packets, getPacketId, RequestNetworkSettingsPacket,ServerboundLoadingScreenPacketPacket,  PlayStatus, ServerboundLoadingScreenType, SetLocalPlayerAsInitializedPacket, RequestChunkRadiusPacket,  ClientToServerHandshakePacket, DataPacket, ResourcePackResponse, ResourcePackClientResponsePacket, TextPacket, TextPacketType, type StartGamePacket, type ResourcePackStackPacket, type PlayStatusPacket, type ResourcePacksInfoPacket } from "@serenityjs/protocol";
 import { authenticate, createOfflineSession, PacketCompressor, type Profile } from "../network";
 import { ClientData } from "./client-data";
 import { createHash } from "node:crypto";
@@ -26,6 +26,7 @@ class Client extends Emitter<ClientEvents> {
     public iv!: Buffer;
     public packetEncryptor!: PacketEncryptor;
     public runtimeEntityId!: bigint;
+    public cancelPastLogin: boolean;
 
     constructor(options: Partial<ClientOptions>) {
         super();
@@ -44,6 +45,7 @@ class Client extends Emitter<ClientEvents> {
         this.sessionReady = false;
         this._encryptionEnabled = false;
         this._compressionEnabled = false;
+        this.cancelPastLogin = false;
 
         this.data = new ClientData(this);
         this.once("session", this.handleSession.bind(this));
@@ -61,9 +63,9 @@ class Client extends Emitter<ClientEvents> {
             this.once("SetLocalPlayerAsInitializedPacket", this.handleSetLocalPlayerAsInitializedPacket.bind(this));
 
             const interval = setInterval(() => {
-            if (this.status === Status.Connected && this.startGamePacket && this.sessionReady) {       
+                if (this.status === Status.Connected && this.startGamePacket && this.sessionReady) {       
                     clearInterval(interval);
-                    resolve(this.startGamePacket);
+                    resolve([advertisement, this.startGamePacket]);
                 }
             }, 50)
         });
@@ -72,6 +74,7 @@ class Client extends Emitter<ClientEvents> {
     private handleStartGamePacket(packet: StartGamePacket): void {
         this.startGamePacket = packet;
         this.runtimeEntityId = packet.runtimeEntityId;
+        if(this.cancelPastLogin) return;
 
         const radius = new RequestChunkRadiusPacket();
 		radius.radius = this.options.viewDistance;
@@ -84,34 +87,44 @@ class Client extends Emitter<ClientEvents> {
     }
 
     private handleEncapsulated(buffer: Buffer) {
-        const packets = this.packetCompressor.decompress(buffer);
-        this.processPacket(packets);
+        try {
+            const packets = this.packetCompressor.decompress(buffer);
+            for(const packet of packets) {
+                this.processPacket(packet);
+            }
+        } catch (error) {
+            Logger.error('Failed to handle encapsulated packet', error);
+        }
     }
 
-    private sendPacket(packet: DataPacket, priority: Priority = Priority.Normal) { 
-        const serialized = packet.serialize();
-        const compressed = this.packetCompressor.compress(serialized, this.options.compressionMethod);
-        this.raknet.frameAndSend(compressed, priority);
+    private sendPacket(packet: DataPacket | Buffer, priority: Priority = Priority.Normal) { 
+        try {
+            const serialized = packet instanceof DataPacket ? packet.serialize() : packet;
+            const compressed = this.packetCompressor.compress(serialized, this.options.compressionMethod);
+            const frame = new Frame();
+            frame.orderChannel = 0;
+            frame.payload = compressed;
+            this.raknet.sendFrame(frame, priority);
+        } catch (error) {
+            Logger.error(`Failed to send packet ${packet.constructor.name}`, error);
+        }
     }
 
-    public send(packet: DataPacket) {
+    public send(packet: DataPacket | Buffer) {
         this.sendPacket(packet, Priority.Immediate);
     }
 
-    public queue(packet: DataPacket) {
+    public queue(packet: DataPacket | Buffer) {
         this.sendPacket(packet, Priority.Normal);
     }
 
     /** Already decompressed packets */
-    public processPacket(buffers: Buffer[]) {
-        for (const buffer of buffers) {
-            const id = getPacketId(buffer);
-            if(!Packets[id]) continue;
-            const PacketClass = Packets[id];
-            const packet = new PacketClass(buffer).deserialize();
-            // console.log(packet);
-            this.emit(PacketClass.name as PacketNames, packet);
-        }
+    public processPacket(buffer: Buffer) {
+        const id = getPacketId(buffer);
+        if(!Packets[id]) return;
+        const PacketClass = Packets[id];
+        const packet = new PacketClass(buffer).deserialize();
+        this.emit(PacketClass.name as PacketNames, packet);
     }
 
     private handleSession(): void {
@@ -178,7 +191,8 @@ class Client extends Emitter<ClientEvents> {
 
     private handlePlayStatusPacket(packet: PlayStatusPacket) {
 		if (packet.status === PlayStatus.PlayerSpawn) {
-			const init = new SetLocalPlayerAsInitializedPacket();
+            if(this.cancelPastLogin) return;
+            const init = new SetLocalPlayerAsInitializedPacket();
 			init.runtimeEntityId = this.runtimeEntityId;
 
 			const ServerBoundLoadingScreen =
@@ -192,6 +206,7 @@ class Client extends Emitter<ClientEvents> {
     }
 
     private handleResourcePacksInfoPacket(packet: ResourcePacksInfoPacket | ResourcePackStackPacket) {
+        if(this.cancelPastLogin) return;
         const response = new ResourcePackClientResponsePacket;
         response.packs = [];
         response.response = ResourcePackResponse.HaveAllPacks;

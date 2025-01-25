@@ -1,4 +1,4 @@
-import { Client, Logger, type ClientOptions } from "@sanctumterra/raknet";
+import { Client, Frame, Logger, type ClientOptions } from "@sanctumterra/raknet";
 import { Worker, isMainThread, parentPort } from "node:worker_threads";
 
 function connect(options: ClientOptions) {
@@ -88,7 +88,17 @@ function main() {
 			}
 			if (evt.type === "sendFrame") {
 				if (!client) return;
-				client.sendFrame(evt.frame, evt.priority);
+				// evt.name is Frame but as Object not Frame.
+				const frame = new Frame();
+				frame.orderChannel = evt.frame.orderChannel;
+				frame.payload = evt.frame.payload;
+				frame.reliability = evt.frame.reliability;
+				frame.reliableFrameIndex = evt.frame.reliableFrameIndex;
+				frame.sequenceFrameIndex = evt.frame.sequenceFrameIndex;
+				frame.splitCount = evt.frame.splitCount;
+				frame.splitFrameIndex = evt.frame.splitFrameIndex;
+				frame.splitId = evt.frame.splitId;
+				client.sendFrame(frame, evt.priority);
 			}
 			if (evt.type === "frameAndSend") {
 				if (!client) return;

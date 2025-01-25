@@ -3,14 +3,14 @@ import { Server as RaknetServer, Connection, Logger } from "@sanctumterra/raknet
 import { defaultServerOptions, type ServerOptions } from "./server-options";
 import { Player } from "./player";
 
-interface ServerEvents {
+export interface ServerEvents {
     "connection": [Connection];
     "playerConnect": [Player];
     "disconnect": [string];
 }
 
 export class Server extends Emitter<ServerEvents> {
-    private raknet: RaknetServer;
+    public raknet: RaknetServer;
     private connections: Map<string, Player> = new Map();
     public options: ServerOptions;
 

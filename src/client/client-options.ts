@@ -1,5 +1,6 @@
 import { CompressionMethod } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
+import type { ClientCacheStatusPacket } from "../network/client-cache-status";
 
 export enum ProtocolList {
     "1.21.50" = 766,
@@ -69,6 +70,7 @@ type ClientEvents = {
     [K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];
 } & {
     session: [];
+    "ClientCacheStatus": [packet: ClientCacheStatusPacket];
 };
 
 

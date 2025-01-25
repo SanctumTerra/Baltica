@@ -1,6 +1,7 @@
 import { CompressionMethod, type DataPacket } from "@serenityjs/protocol";
 import type { PacketNames } from "../client";
 import type * as Protocol from "@serenityjs/protocol";
+import type { ClientCacheStatusPacket } from "../network/client-cache-status";
 
 type Version = "1.21.50";
 
@@ -11,6 +12,7 @@ export type PlayerEvents = {
     "packet": [DataPacket];
     "error": [Error];
     "login": [];
+    "ClientCacheStatusPacket": [ClientCacheStatusPacket];
 }
 
 
