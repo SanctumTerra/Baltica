@@ -1,4 +1,4 @@
-import { CompressionMethod } from "@serenityjs/protocol";
+import { CompressionMethod, InputMode } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
 import type { ClientCacheStatusPacket } from "../network/client-cache-status";
 
@@ -25,6 +25,12 @@ export enum DeviceOS {
 	Linux = 15,
 }
 
+type LoginPacketOptions = {
+	DeviceModel: string;
+	CurrentInputMode: InputMode;
+	DefaultInputMode: InputMode;
+};
+
 type ClientOptions = {
 	host: string;
 	port: number;
@@ -39,6 +45,7 @@ type ClientOptions = {
 	skinData: object | undefined;
 	offline: boolean;
 	worker: boolean;
+	loginOptions: LoginPacketOptions;
 };
 
 const defaultClientOptions: ClientOptions = {
@@ -55,6 +62,11 @@ const defaultClientOptions: ClientOptions = {
 	skinData: undefined,
 	offline: false,
 	worker: false,
+	loginOptions: {
+		DeviceModel: "SwimmingPool",
+		CurrentInputMode: InputMode.GamePad,
+		DefaultInputMode: InputMode.GamePad,
+	},
 };
 
 type PacketNames = {

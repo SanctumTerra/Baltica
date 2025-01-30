@@ -4,6 +4,7 @@ import { ClientData } from "../client-data";
 import { DeviceOS } from "../client-options";
 import type { AnimatedImageData, PersonaPieces, PieceTintColors } from "./skin";
 import * as skin from "./skin/Skin.json";
+import { InputMode } from "@serenityjs/protocol";
 
 export type Payload = {
 	AnimatedImageData: AnimatedImageData[];
@@ -63,10 +64,10 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		CapeOnClassicSkin: skin.skinData.CapeOnClassicSkin,
 		ClientRandomId: Date.now(),
 		CompatibleWithClientSideChunkGen: false,
-		CurrentInputMode: 1,
-		DefaultInputMode: 1,
+		CurrentInputMode: client.options.loginOptions.CurrentInputMode,
+		DefaultInputMode: client.options.loginOptions.DefaultInputMode,
 		DeviceId: ClientData.nextUUID(),
-		DeviceModel: "Helicopter",
+		DeviceModel: client.options.loginOptions.DeviceModel,
 		DeviceOS: client.options.deviceOS ?? DeviceOS.NintendoSwitch,
 		GameVersion: client.options?.version,
 		GuiScale: 0,
