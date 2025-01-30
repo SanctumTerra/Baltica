@@ -1,5 +1,10 @@
-import { Client, Frame, Logger, type ClientOptions } from "@sanctumterra/raknet";
 import { Worker, isMainThread, parentPort } from "node:worker_threads";
+import {
+	Client,
+	type ClientOptions,
+	Frame,
+	Logger,
+} from "@sanctumterra/raknet";
 
 function connect(options: ClientOptions) {
 	if (isMainThread) {

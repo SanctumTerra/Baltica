@@ -1,9 +1,9 @@
-import { v3 } from "uuid-1345";
-import { Authflow, Titles } from "prismarine-auth";
-import { Logger } from "@sanctumterra/raknet";
-import { verify } from "jsonwebtoken";
 import { createPublicKey } from "node:crypto";
+import { Logger } from "@sanctumterra/raknet";
 import type { LoginTokens } from "@serenityjs/protocol";
+import { verify } from "jsonwebtoken";
+import { Authflow, Titles } from "prismarine-auth";
+import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
 
 export interface Profile {
@@ -163,14 +163,14 @@ const readAuth = (chain: string[]) => {
 			verified = true;
 		}
 
-        // @ts-expect-error Wrong type in Authflow definition
-        pubKey = decoded.identityPublicKey
-            ?  // @ts-expect-error Wrong type in Authflow definition
-            getDER(decoded.identityPublicKey)
+		// @ts-expect-error Wrong type in Authflow definition
+		pubKey = decoded.identityPublicKey
+			? // @ts-expect-error Wrong type in Authflow definition
+				getDER(decoded.identityPublicKey)
 			: x5u;
-        // @ts-expect-error Wrong type in Authflow definition
+		// @ts-expect-error Wrong type in Authflow definition
 		key = decoded.identityPublicKey || key;
-        // @ts-expect-error Wrong type in Authflow definition
+		// @ts-expect-error Wrong type in Authflow definition
 		authData = { ...authData, ...decoded };
 	}
 

@@ -1,17 +1,17 @@
+import { type KeyExportOptions, KeyObject, createECDH } from "node:crypto";
+import { promisify } from "node:util";
+import { Logger } from "@sanctumterra/raknet";
 import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
-import type { Client } from "./client";
-import { v3 as uuidv3 } from "uuid-1345";
-import { type Payload, createDefaultPayload } from "./types/payload";
 import {
-	sign as signCallback,
 	type Secret,
 	type SignOptions,
+	sign as signCallback,
 } from "jsonwebtoken";
-import { promisify } from "node:util";
-import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
-import { type LoginData, prepareLoginData } from "./types/login-data";
-import { Logger } from "@sanctumterra/raknet";
 import type { Player } from "src/server/player";
+import { v3 as uuidv3 } from "uuid-1345";
+import type { Client } from "./client";
+import { type LoginData, prepareLoginData } from "./types/login-data";
+import { type Payload, createDefaultPayload } from "./types/payload";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -27,112 +27,109 @@ const signAsync = promisify(signCallback) as unknown as (
 ) => Promise<string>;
 
 class ClientData {
-    public client: Client | Player;
-    /** This Contains a lot of Data for the Login Packet */
-    public payload: Payload;
-    /** This Contains the Access Tokens from Auth */
+	public client: Client | Player;
+	/** This Contains a lot of Data for the Login Packet */
+	public payload: Payload;
+	/** This Contains the Access Tokens from Auth */
 	public accessToken!: string[];
-    /** This Contains the Login Data */
-    public loginData: LoginData;
-    /** This Contains the Shared Secret */
-    public sharedSecret!: Buffer;
+	/** This Contains the Login Data */
+	public loginData: LoginData;
+	/** This Contains the Shared Secret */
+	public sharedSecret!: Buffer;
 
-    constructor(client: Client | Player) {
-        this.client = client;
-        this.payload = createDefaultPayload(client);
-        this.loginData = prepareLoginData();
-    }
+	constructor(client: Client | Player) {
+		this.client = client;
+		this.payload = createDefaultPayload(client);
+		this.loginData = prepareLoginData();
+	}
 
-    public createLoginPacket() : LoginPacket {
-        const loginPacket = new LoginPacket();
-		const chain = [
-			this.loginData.clientIdentityChain,
-			...this.accessToken,
-		];
+	public createLoginPacket(): LoginPacket {
+		const loginPacket = new LoginPacket();
+		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
 		const userChain = this.loginData.clientUserChain;
 		const encodedChain = JSON.stringify({ chain });
-        loginPacket.protocol = this.client.protocol;
+		loginPacket.protocol = this.client.protocol;
 		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
-        return loginPacket;
-    }
+		return loginPacket;
+	}
 
-    public async createClientChain(
-        mojangKey: string | null,
-        offline: boolean,
-    ): Promise<string> {
-        return this.createClientChainInternal(mojangKey, offline);
-    }
+	public async createClientChain(
+		mojangKey: string | null,
+		offline: boolean,
+	): Promise<string> {
+		return this.createClientChainInternal(mojangKey, offline);
+	}
 
-    private async createClientChainInternal(
-        mojangKey: string | null,
-        offline: boolean,
-    ): Promise<string> {
-        const { clientX509, ecdhKeyPair } = this.loginData;
-        let payload: Record<string, unknown>;
-        let signOptions: SignOptions;
-    
-        if (offline) {
-            payload = {
-                extraData: {
-                    displayName: this.client.profile.name,
-                    identity: this.client.profile.uuid,
-                    titleId: "89692877",
-                    XUID: "0",
-                },
-                certificateAuthority: true,
-                identityPublicKey: clientX509,
-            };
-            signOptions = {
-                algorithm: algorithm,
-                notBefore: 0,
-                issuer: "self",
-                expiresIn: 60 * 60,
-                header: { alg: algorithm, x5u: clientX509, typ: undefined },
-            };
-        } else {
-            payload = {
-                identityPublicKey: mojangKey || PUBLIC_KEY,
-                certificateAuthority: true,
-            };
-            signOptions = {
-                algorithm: algorithm,
-                header: { alg: algorithm, x5u: clientX509, typ: undefined },
-            };
-        }
-    
-        return signAsync(
-            payload,
-            ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-            signOptions,
-        );
-    }
+	private async createClientChainInternal(
+		mojangKey: string | null,
+		offline: boolean,
+	): Promise<string> {
+		const { clientX509, ecdhKeyPair } = this.loginData;
+		let payload: Record<string, unknown>;
+		let signOptions: SignOptions;
 
-    public async createClientUserChain(privateKey: KeyObject): Promise<string> {
-        const { clientX509 } = this.loginData;
-        const customPayload = this.client.options.skinData || {};
-    
-        const payload: Payload = {
-            ...this.payload,
-            ...customPayload,
-            ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
-            ClientRandomId: Date.now(),
-            DeviceId: ClientData.nextUUID(),
-            PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
-            SelfSignedId: ClientData.nextUUID(),
-        };
-    
-        return signAsync(
-            payload,
-            privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-            {
-                algorithm,
-                header: { alg: algorithm, x5u: clientX509, typ: undefined },
-                noTimestamp: true,
-            }
-        );
-    }
+		if (offline) {
+			payload = {
+				extraData: {
+					displayName: this.client.profile.name,
+					identity: this.client.profile.uuid,
+					titleId: "89692877",
+					XUID: "0",
+				},
+				certificateAuthority: true,
+				identityPublicKey: clientX509,
+			};
+			signOptions = {
+				algorithm: algorithm,
+				notBefore: 0,
+				issuer: "self",
+				expiresIn: 60 * 60,
+				header: { alg: algorithm, x5u: clientX509, typ: undefined },
+			};
+		} else {
+			payload = {
+				identityPublicKey: mojangKey || PUBLIC_KEY,
+				certificateAuthority: true,
+			};
+			signOptions = {
+				algorithm: algorithm,
+				header: { alg: algorithm, x5u: clientX509, typ: undefined },
+			};
+		}
 
-    public createSharedSecret(
+		return signAsync(
+			payload,
+			ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+			signOptions,
+		);
+	}
+
+	public async createClientUserChain(privateKey: KeyObject): Promise<string> {
+		const { clientX509 } = this.loginData;
+		const customPayload = this.client.options.skinData || {};
+
+		const payload: Payload = {
+			...this.payload,
+			...customPayload,
+			ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
+			ClientRandomId: Date.now(),
+			DeviceId: ClientData.nextUUID(),
+			PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
+			SelfSignedId: ClientData.nextUUID(),
+		};
+
+		return signAsync(
+			payload,
+			privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+			{
+				algorithm,
+				header: { alg: algorithm, x5u: clientX509, typ: undefined },
+				noTimestamp: true,
+			},
+		);
+	}
+
+	public createSharedSecret(
 		privateKey: KeyObject,
 		publicKey: KeyObject,
 	): Buffer {
@@ -178,7 +175,7 @@ class ClientData {
 		}
 	}
 
-    private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
+	private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
 		if (
 			!(privateKey instanceof KeyObject) ||
 			!(publicKey instanceof KeyObject)
@@ -193,7 +190,7 @@ class ClientData {
 		}
 	}
 
-    public static nextUUID() {
+	public static nextUUID() {
 		return uuidv3({
 			namespace: "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
 			name: Date.now().toString(),

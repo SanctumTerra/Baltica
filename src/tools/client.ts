@@ -1,22 +1,49 @@
 import { Logger } from "@sanctumterra/raknet";
-import { Client } from "../client/client";
 import type { TextPacket } from "@serenityjs/protocol";
+import { DeviceOS } from "../client";
+import { Client } from "../client/client";
+import { ClientCacheStatusPacket } from "../network/client-cache-status";
 
 const client = new Client({
-    host: "127.0.0.1",
-    port: 19132,
-    offline: true,
-    version: "1.21.50",
-    worker: false,
+	host: "127.0.0.1",
+	port: 19132,
+	// offline: true,
+	version: "1.21.50",
+	worker: true,
+	deviceOS: DeviceOS.Win10,
 });
 
 console.time("client.connect");
 client.connect().then(() => {
-    console.timeEnd("client.connect");
-    setInterval(() => {
-        client.sendMessage(`Raknet is working! ${Date.now()}`);
-    }, 50)
+	console.timeEnd("client.connect");
+	setInterval(() => {
+		// It does not freeze anymore :D
+		// client.sendMessage(`Raknet is working! ${Date.now()}`);
+	}, 50);
 });
+
+// client.on("packet", (packet) => {
+// 	console.log(packet.constructor.name);
+// });
+if (!process.argv.includes("noLog")) {
+	if (!process.argv.includes("pmmp")) {
+		client.on("LevelChunkPacket", (packet) => {
+			console.log(packet);
+		});
+	}
+	client.on("DisconnectPacket", (packet) => {
+		console.log(packet);
+	});
+
+	client.on("ClientCacheStatus", (packet) => {
+		console.log(packet);
+	});
+
+	client.on("ResourcePacksInfoPacket", (packet) => {
+		console.log(packet);
+	});
+}
+client.send(ClientCacheStatusPacket.create(false));
 
 client.on("TextPacket", handleTextPacket);
 async function handleTextPacket(packet: TextPacket): Promise<void> {

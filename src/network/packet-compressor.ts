@@ -1,80 +1,102 @@
-import { CompressionMethod, Framer } from "@serenityjs/protocol";
-import type { Client } from "../client/client";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
-import { PacketEncryptor } from "./packet-encryptor";
+import { CompressionMethod, Framer } from "@serenityjs/protocol";
 import type { Player } from "src/server/player";
+import type { Client } from "../client/client";
+import { PacketEncryptor } from "./packet-encryptor";
 
 class PacketCompressor {
-    private client: Client | Player;
-    constructor(client: Client | Player) {
-        this.client = client;
-    }
-    
-    public decompress(buffer: Buffer): Buffer[] {
-        if(buffer[0] !== 0xfe) throw new Error("Invalid packet");        
+	private client: Client | Player;
+	constructor(client: Client | Player) {
+		this.client = client;
+	}
 
-        let packet = buffer.subarray(1);
-        if(this.client._encryptionEnabled) {
-            packet = this.client.packetEncryptor.decryptPacket(packet);
-        }
+	public decompress(buffer: Buffer): Buffer[] {
+		if (buffer[0] !== 0xfe) throw new Error("Invalid packet");
 
-        const header = packet[0];
-        const method = this.getMethod(header);
-            
-        if (method !== CompressionMethod.NotPresent) {
-            packet = packet.subarray(1);
-        }
+		let packet = buffer.subarray(1);
+		if (this.client._encryptionEnabled) {
+			packet = this.client.packetEncryptor.decryptPacket(packet);
+		}
 
-        const inflated = this.inflate(packet, method);
-        const framed = Framer.unframe(inflated);
-        return framed;
-    }
+		const method = this.getMethod(packet[0]);
 
-    public inflate(buffer: Buffer, method: CompressionMethod): Buffer {
-        switch(method) {
-            case CompressionMethod.Zlib:
-                return inflateRawSync(buffer);
-            case CompressionMethod.Snappy:
-                throw new Error("Snappy compression is not supported");
-            default:
-                return buffer;
-        }
-    }
+		if (method !== CompressionMethod.NotPresent) {
+			packet = packet.subarray(1);
+		}
 
-    public compress(buffer: Buffer, method: CompressionMethod): Buffer {
-        const framed = Framer.frame(buffer);
-        if(this.client._encryptionEnabled) {
-            return this.client.packetEncryptor.encryptPacket(framed);
-        }
+		const inflated = this.inflate(packet, method);
+		return Framer.unframe(inflated);
+	}
 
-        const shouldCompress = framed.byteLength > this.client.options.compressionThreshold && this.client._compressionEnabled;
+	public inflate(buffer: Buffer, method: CompressionMethod): Buffer {
+		switch (method) {
+			case CompressionMethod.Zlib:
+				return inflateRawSync(buffer);
+			case CompressionMethod.Snappy:
+				throw new Error("Snappy compression is not supported");
+			default:
+				return buffer;
+		}
+	}
 
-        const compressed = shouldCompress ? 
-        Buffer.concat([
-            Buffer.from([this.client.options.compressionMethod]), this.deflate(framed, this.client.options.compressionMethod)
-        ]) : this.client._compressionEnabled ? 
-        Buffer.concat([Buffer.from([CompressionMethod.None]), framed]) : framed;
+	public compress(
+		buffer: Buffer,
+		method: CompressionMethod = this.client.options.compressionMethod,
+	): Buffer {
+		const framed = Framer.frame(buffer);
 
-		return Buffer.concat([Buffer.from([254]), compressed]);
-    }
+		const shouldCompress =
+			this.client._compressionEnabled &&
+			(this.client.options.compressionThreshold === 1 ||
+				(this.client.options.compressionThreshold > 1 &&
+					framed.byteLength > this.client.options.compressionThreshold));
 
-    public deflate(buffer: Buffer, method: CompressionMethod): Buffer {
-        switch(method) {
-            case CompressionMethod.Zlib:
-                return deflateRawSync(buffer);
-            case CompressionMethod.Snappy:
-                throw new Error("Snappy compression is not supported");
-            default:
-                return buffer;
-        }
-    }
+		let result: Buffer;
+		if (shouldCompress) {
+			const deflated = this.deflate(
+				framed,
+				this.client.options.compressionMethod,
+			);
+			result = Buffer.allocUnsafe(2 + deflated.length);
+			result[0] = 0xfe;
+			result[1] = this.client.options.compressionMethod;
+			deflated.copy(result, 2);
+		} else if (this.client._compressionEnabled) {
+			// Allocate buffer with exact size needed: 1 (header) + 1 (compression method) + framed length
+			result = Buffer.allocUnsafe(2 + framed.length);
+			result[0] = 0xfe;
+			result[1] = CompressionMethod.None;
+			framed.copy(result, 2);
+		} else {
+			// Allocate buffer with exact size needed: 1 (header) + framed length
+			result = Buffer.allocUnsafe(1 + framed.length);
+			result[0] = 0xfe;
+			framed.copy(result, 1);
+		}
 
-    public getMethod(header: number): CompressionMethod {
-        return header in CompressionMethod
+		if (this.client._encryptionEnabled) {
+			return this.client.packetEncryptor.encryptPacket(result.subarray(1));
+		}
+
+		return result;
+	}
+
+	public deflate(buffer: Buffer, method: CompressionMethod): Buffer {
+		switch (method) {
+			case CompressionMethod.Zlib:
+				return deflateRawSync(buffer);
+			case CompressionMethod.Snappy:
+				throw new Error("Snappy compression is not supported");
+			default:
+				return buffer;
+		}
+	}
+
+	public getMethod(header: number): CompressionMethod {
+		return header in CompressionMethod
 			? (header as CompressionMethod)
 			: CompressionMethod.NotPresent;
-    }
-
+	}
 }
 
 export { PacketCompressor };

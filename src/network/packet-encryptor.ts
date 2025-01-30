@@ -1,11 +1,11 @@
-import { CompressionMethod } from "@serenityjs/protocol";
 import * as crypto from "node:crypto";
 import * as Zlib from "node:zlib";
+import { CompressionMethod } from "@serenityjs/protocol";
 import type { Client } from "../client/client";
 import type { Player } from "../server/player";
 
 class PacketEncryptor {
-    static instance: PacketEncryptor;
+	static instance: PacketEncryptor;
 
 	public secretKeyBytes: Uint8Array;
 	public compressionThreshold: number;
@@ -72,20 +72,8 @@ class PacketEncryptor {
 	}
 
 	encryptPacket(framed: Buffer): Buffer {
-		let deflated: Buffer;
-		// framed.byteLength > this.client.data.compressionThreshold
-		if (framed.byteLength > this.client.options.compressionThreshold) {
-			deflated = Buffer.from([
-				this.client.options.compressionMethod,
-				...Zlib.deflateRawSync(framed, { level: 7 }),
-			]);
-		} else {
-			deflated = Buffer.from([this.client.options.compressionMethod, ...framed]);
-		}
-
-		const checksum = this.computeCheckSum(deflated, this.sendCounter);
-
-		const packetToEncrypt = Buffer.concat([deflated, checksum]);
+		const checksum = this.computeCheckSum(framed, this.sendCounter);
+		const packetToEncrypt = Buffer.concat([framed, checksum]);
 
 		if (!this.cipher) {
 			throw new Error("Cipher not initialized");
@@ -98,7 +86,6 @@ class PacketEncryptor {
 
 		return payload;
 	}
-
 
 	decryptPacket(encryptedPayload: Buffer): Buffer {
 		if (!this.decipher) {

@@ -1,13 +1,13 @@
 import type { Worker } from "node:worker_threads";
 import {
-	type ClientOptions,
 	type ClientEvents,
-	Priority,
+	type ClientOptions,
 	type Frame,
+	Priority,
 } from "@sanctumterra/raknet";
-import { defaultClientOptions, type Advertisement } from "@sanctumterra/raknet";
-import { connect } from "./worker";
+import { type Advertisement, defaultClientOptions } from "@sanctumterra/raknet";
 import { Emitter } from "../../libs/emitter";
+import { connect } from "./worker";
 
 class WorkerClient extends Emitter<ClientEvents> {
 	private _worker: Worker | undefined;
@@ -98,10 +98,9 @@ class WorkerClient extends Emitter<ClientEvents> {
 		this.removeAllListeners();
 	}
 
-
 	public frameAndSend(payload: Buffer, priority: Priority = Priority.Normal) {
-		if(!this._worker) return;
-		this._worker.postMessage({type: "frameAndSend", payload, priority});
+		if (!this._worker) return;
+		this._worker.postMessage({ type: "frameAndSend", payload, priority });
 	}
 
 	public sendFrame(frame: Frame, priority: Priority = Priority.Normal) {
