@@ -22,9 +22,12 @@ client.connect().then(() => {
 	}, 50);
 });
 
-// client.on("packet", (packet) => {
+if (process.execArgv.includes("--inspect")) {
+	client.on("packet", (packet) => {
+		console.log(packet);
+	});
+}
 // 	console.log(packet.constructor.name);
-// });
 if (!process.argv.includes("noLog")) {
 	if (!process.argv.includes("pmmp")) {
 		client.on("LevelChunkPacket", (packet) => {

@@ -62,7 +62,7 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		CapeImageHeight: skin.skinData.CapeImageHeight,
 		CapeImageWidth: skin.skinData.CapeImageWidth,
 		CapeOnClassicSkin: skin.skinData.CapeOnClassicSkin,
-		ClientRandomId: Date.now(),
+		ClientRandomId: ClientData.generateId(),
 		CompatibleWithClientSideChunkGen: false,
 		CurrentInputMode: client.options.loginOptions.CurrentInputMode,
 		DefaultInputMode: client.options.loginOptions.DefaultInputMode,
@@ -74,14 +74,14 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		IsEditorMode: false,
 		LanguageCode: "en_US",
 		MaxViewDistance: client.options?.viewDistance,
-		MemoryTier: 0,
+		MemoryTier: 2,
 		OverrideSkin: false,
 		PersonaPieces: skin.skinData.PersonaPieces,
 		PersonaSkin: skin.skinData.PersonaSkin,
 		PieceTintColors: skin.skinData.PieceTintColors,
-		PlatformOfflineId: "",
-		PlatformOnlineId: "",
-		PlatformType: 1,
+		PlatformOfflineId: ClientData.nextUUID().replace(/-/g, ""),
+		PlatformOnlineId: ClientData.OnlineId(),
+		PlatformType: 2,
 		PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
 		PremiumSkin: skin.skinData.PremiumSkin,
 		SelfSignedId: ClientData.nextUUID(),
@@ -100,4 +100,9 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		TrustedSkin: skin.skinData.TrustedSkin,
 		UIProfile: 0,
 	};
+
+
 };
+const getRandomId = () => {
+	return Math.floor(Math.random() * Date.now() * Math.random() * 1000000) ^ Date.now();
+}
