@@ -7,10 +7,10 @@
 	"types": "dist/index.d.ts",
 	"scripts": {
 		"build": "tsc",
-    "lint": "npx @biomejs/biome lint ./src",
-    "format": "npx @biomejs/biome format ./src",
+		"lint": "npx @biomejs/biome lint ./src",
+		"format": "npx @biomejs/biome format ./src",
 		"format:write": "npx @biomejs/biome format --write ./src",
-    "lint:write": "npx @biomejs/biome lint --write ./src"
+		"lint:write": "npx @biomejs/biome lint --write ./src"
 	},
 	"contributors": [
 		{
@@ -20,7 +20,7 @@
 		}
 	],
 	"dependencies": {
-		"@sanctumterra/raknet": "file:../Raknet",
+		"@sanctumterra/raknet": "^1.3.72",
 		"@serenityjs/protocol": "^0.7.0",
 		"jsonwebtoken": "^9.0.2",
 		"prismarine-auth": "^2.6.0",
