@@ -1,0 +1,70 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: 
+      - master
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm install
+      - name: Run lint
+        run: npm run lint
+
+  build:
+    needs: [lint]    
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/
+            package.json
+            package-lock.json
+
+  publish:
+    needs: [build]
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Check if package can be published
+        run: npm publish --dry-run --verbose
+      - name: Publish package
+        if: success()
+        run: npm publish --access=public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
