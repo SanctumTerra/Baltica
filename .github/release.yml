@@ -1,0 +1,42 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20' 
+
+      - name: Install dependencies
+        run: npm i
+
+      - name: Build
+        run: npm run build
+
+      - name: Get version and Minecraft info
+        id: package-info
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          echo "minecraft=$(node -p "require('./package.json').minecraft")" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.package-info.outputs.version }} \
+            --title "Release v${{ steps.package-info.outputs.version }} for Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            --notes "Release for @sanctumterra/client v${{ steps.package-info.outputs.version }}
+            Compatible with Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            --target ${{ github.sha }}
