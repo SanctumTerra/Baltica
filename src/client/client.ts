@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 import { createPublicKey } from "node:crypto";
 import {
+	type Advertisement,
 	Frame,
 	Logger,
 	Priority,
 	Client as RaknetClient,
-	Reliability,
 	Status,
 } from "@sanctumterra/raknet";
+
 import {
 	ClientToServerHandshakePacket,
 	DataPacket,
@@ -94,7 +95,11 @@ class Client extends Emitter<ClientEvents> {
 		this.options.offline ? createOfflineSession(this) : authenticate(this);
 	}
 
-	public async connect() {
+	public async connect(): Promise<[Advertisement, StartGamePacket]> {
+		while (!this.sessionReady) {
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+
 		this.packetCompressor = new PacketCompressor(this);
 		this.listen();
 		const advertisement = await this.raknet.connect();
