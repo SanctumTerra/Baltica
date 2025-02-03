@@ -7,10 +7,11 @@ import { ClientCacheStatusPacket } from "../network/client-cache-status";
 const client = new Client({
 	host: "127.0.0.1",
 	port: 19132,
-	// offline: true,
+	offline: process.argv.includes("offline"),
 	version: "1.21.50",
 	worker: true,
 	deviceOS: DeviceOS.Win10,
+	betaAuth: process.argv.includes("betaAuth"),
 });
 
 console.time("client.connect");
@@ -34,6 +35,11 @@ if (!process.argv.includes("noLog")) {
 			console.log(packet);
 		});
 	}
+
+	client.on("AddPaintingPacket", (packet) => {
+		console.log(packet);
+	});
+
 	client.on("DisconnectPacket", (packet) => {
 		console.log(packet);
 	});
@@ -46,7 +52,6 @@ if (!process.argv.includes("noLog")) {
 		console.log(packet);
 	});
 }
-client.send(ClientCacheStatusPacket.create(false));
 
 client.on("TextPacket", handleTextPacket);
 async function handleTextPacket(packet: TextPacket): Promise<void> {
@@ -58,7 +63,7 @@ async function handleTextPacket(packet: TextPacket): Promise<void> {
 		"multiplayer.player.joined": () =>
 			Logger.chat(`§e${param1} §ejoined the game§r`),
 		"multiplayer.player.left": () =>
-			Logger.chat(`§f${param1} §7left the game§r`),
+			Logger.chat(`§e${param1} §eleft the game§r`),
 		"chat.type.announcement": () => Logger.chat(`§d[${param1}] ${param2}§r`),
 	};
 

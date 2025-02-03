@@ -1,6 +1,8 @@
 import { CompressionMethod, InputMode } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
 import type { ClientCacheStatusPacket } from "../network/client-cache-status";
+import type { Advertisement } from "@sanctumterra/raknet";
+import type { AddPaintingPacket } from "../network/packets";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
@@ -46,6 +48,7 @@ type ClientOptions = {
 	offline: boolean;
 	worker: boolean;
 	loginOptions: LoginPacketOptions;
+	betaAuth: boolean;
 };
 
 const defaultClientOptions: ClientOptions = {
@@ -67,6 +70,7 @@ const defaultClientOptions: ClientOptions = {
 		CurrentInputMode: InputMode.GamePad,
 		DefaultInputMode: InputMode.GamePad,
 	},
+	betaAuth: false,
 };
 
 type PacketNames = {
@@ -82,8 +86,10 @@ type ClientEvents = {
 } & {
 	session: [];
 	ClientCacheStatus: [packet: ClientCacheStatusPacket];
+	AddPaintingPacket: [packet: AddPaintingPacket];
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
+	connect: [packet: Advertisement];
 };
 
 export {

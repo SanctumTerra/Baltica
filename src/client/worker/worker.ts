@@ -10,7 +10,6 @@ function connect(options: ClientOptions) {
 	if (isMainThread) {
 		const worker = new Worker(__filename);
 
-		// Add error handler for the worker itself
 		worker.on("error", (error) => {
 			Logger.error(`Worker error: ${error.message}`);
 		});
@@ -25,7 +24,6 @@ function cleanup() {
 	if (client) {
 		try {
 			client.removeAll();
-			// Add any additional cleanup needed
 		} catch (error) {
 			Logger.error(`Cleanup error: ${error}`);
 		}
@@ -38,7 +36,6 @@ function main() {
 		return;
 	}
 
-	// Handle worker thread termination
 	process.on("exit", cleanup);
 	process.on("SIGINT", () => {
 		cleanup();
@@ -48,12 +45,10 @@ function main() {
 	parentPort.on("message", async (evt) => {
 		try {
 			if (evt.type === "connect") {
-				// Cleanup any existing client
 				cleanup();
 
 				client = new Client(evt.options);
 
-				// Set up error handling
 				client.on("error", (error) => {
 					if (!parentPort) return;
 					parentPort.postMessage({
@@ -62,7 +57,6 @@ function main() {
 					});
 				});
 
-				// Wrap event handlers in try-catch blocks
 				client.on("encapsulated", (...args) => {
 					try {
 						if (!parentPort) return;

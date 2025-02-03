@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Publish and Release
 
 on:
   push:
@@ -45,13 +45,15 @@ jobs:
             package.json
             package-lock.json
 
-  publish:
+  publish-and-release:
     needs: [build]
     permissions:
       id-token: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -64,7 +66,23 @@ jobs:
       - name: Check if package can be published
         run: npm publish --dry-run --verbose
       - name: Publish package
-        if: success()
+        id: npm-publish
         run: npm publish --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Get version and Minecraft info
+        if: success()
+        id: package-info
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          echo "minecraft=$(node -p "require('./package.json').minecraft")" >> $GITHUB_OUTPUT
+      - name: Create Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.package-info.outputs.version }} \
+            --title "Release v${{ steps.package-info.outputs.version }} for Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            --notes "Release for @sanctumterra/client v${{ steps.package-info.outputs.version }}
+            Compatible with Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            --target ${{ github.sha }}

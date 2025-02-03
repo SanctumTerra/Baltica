@@ -38,7 +38,6 @@ import type { PlayerEvents } from "./server-options";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);
-// Pre-serialize static packets
 const PLAY_STATUS_LOGIN_SUCCESS = new PlayStatusPacket();
 PLAY_STATUS_LOGIN_SUCCESS.status = PlayStatus.LoginSuccess;
 const PLAY_STATUS_LOGIN_SUCCESS_BUFFER = PLAY_STATUS_LOGIN_SUCCESS.serialize();
@@ -71,7 +70,6 @@ class Player extends Emitter<PlayerEvents> {
 	}
 
 	private initializeStaticPackets() {
-		// Pre-serialize frequently used static packets
 		const settings = new NetworkSettingsPacket();
 		const options = this.server.options;
 		settings.compressionThreshold = options.compressionThreshold;
@@ -97,7 +95,12 @@ class Player extends Emitter<PlayerEvents> {
 				this.send(preSerialized);
 			} else {
 				const settings = new NetworkSettingsPacket();
-				// ... existing settings code ...
+				settings.compressionThreshold =
+					this.server.options.compressionThreshold;
+				settings.compressionMethod = this.server.options.compressionMethod;
+				settings.clientScalar = 0;
+				settings.clientThrottle = false;
+				settings.clientThreshold = 0;
 				this.send(settings);
 			}
 
@@ -211,7 +214,7 @@ class Player extends Emitter<PlayerEvents> {
 	}
 
 	public processPacket(packet: Buffer) {
-		const id = packet.readUInt8(0); // Simplified packet ID extraction
+		const id = packet.readUInt8(0);
 		if (id === 0x81) {
 			// 0x81 is hex for 129
 			Logger.debug("Received ClientCacheStatusPacket");

@@ -5,6 +5,7 @@ import { verify } from "jsonwebtoken";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
+import { Bedrock } from "./beta/auth";
 
 export interface Profile {
 	name: string;
@@ -41,12 +42,48 @@ async function createOfflineSession(client: Client): Promise<void> {
 
 async function authenticate(client: Client): Promise<void> {
 	const startTime = Date.now();
-
 	try {
+		if (client.options.betaAuth) {
+			if (!process.argv.includes("betaAuth"))
+				throw new Error("Beta authentication is in beta, please do not use.");
+			Logger.info("Using Bedrock Auth");
+			const bedrock = new Bedrock(
+				client.options.version,
+				true,
+				client.data.loginData.clientX509,
+			);
+			try {
+				const success = await bedrock.auth();
+				if (!success) {
+					throw new Error("Beta authentication failed");
+				}
+			} catch (error) {
+				Logger.error(
+					`Beta authentication failed: ${error instanceof Error ? error.message : String(error)}`,
+				);
+				throw error;
+			}
+			const chains = bedrock.getChainData();
+			if (!chains || chains.length < 2) {
+				throw new Error("Invalid chain data received");
+			}
+			Logger.debug("Chain data received:", chains);
+			const endTime = Date.now();
+			Logger.info(
+				`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
+			);
+
+			const profile = extractProfile(chains[1]);
+
+			await setupClientProfile(client, profile, chains);
+			await setupClientChains(client);
+			client.emit("session");
+			return;
+		}
+		// Logger.info("Using PrismarineJS Auth");
 		const authflow = createAuthflow(client);
 		const chains = await getMinecraftBedrockToken(authflow, client);
 		const profile = extractProfile(chains[1]);
-
 		const endTime = Date.now();
 		Logger.info(
 			`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
@@ -65,16 +102,41 @@ async function authenticate(client: Client): Promise<void> {
 }
 
 function extractProfile(jwt: string): Profile {
-	const [, payload] = jwt.split(".");
-	const xboxProfile = JSON.parse(Buffer.from(payload, "base64").toString());
+	if (!jwt) {
+		Logger.error("JWT is undefined or empty");
+		return {
+			name: "Player",
+			uuid: "adfcf5ca-206c-404a-aec4-f59fff264c9b",
+			xuid: 0,
+		};
+	}
 
-	return {
-		name: xboxProfile?.extraData?.displayName || "Player",
-		uuid:
-			xboxProfile?.extraData?.identity ||
-			"adfcf5ca-206c-404a-aec4-f59fff264c9b",
-		xuid: xboxProfile?.extraData?.XUID || 0,
-	};
+	try {
+		const [, payload] = jwt.split(".");
+		if (!payload) {
+			Logger.error("Invalid JWT format - no payload section found");
+			throw new Error("Invalid JWT format");
+		}
+
+		const xboxProfile = JSON.parse(Buffer.from(payload, "base64").toString());
+
+		return {
+			name: xboxProfile?.extraData?.displayName || "Player",
+			uuid:
+				xboxProfile?.extraData?.identity ||
+				"adfcf5ca-206c-404a-aec4-f59fff264c9b",
+			xuid: xboxProfile?.extraData?.XUID || 0,
+		};
+	} catch (error) {
+		Logger.error(
+			`Error extracting profile: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return {
+			name: "Player",
+			uuid: "adfcf5ca-206c-404a-aec4-f59fff264c9b",
+			xuid: 0,
+		};
+	}
 }
 
 function createAuthflow(client: Client): Authflow {

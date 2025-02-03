@@ -100,9 +100,10 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		TrustedSkin: skin.skinData.TrustedSkin,
 		UIProfile: 0,
 	};
-
-
 };
 const getRandomId = () => {
-	return Math.floor(Math.random() * Date.now() * Math.random() * 1000000) ^ Date.now();
-}
+	return (
+		Math.floor(Math.random() * Date.now() * Math.random() * 1000000) ^
+		Date.now()
+	);
+};

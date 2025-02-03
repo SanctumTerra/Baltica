@@ -23,10 +23,9 @@ bridge.on("connect", (player) => {
 		// packet.modified = true;
 	});
 
-	// player.on("serverbound-PlayerAuthInputPacket", (packet) => {
-	//     packet.inputData.setFlag(InputData.StartSwimming, true);
-	//     packet.inputData = packet.inputData;
-	// })
+	player.on("serverbound-PlayerAuthInputPacket", (packet) => {
+		packet.inputData.setFlag(InputData.StartSwimming, true);
+	});
 
 	// player.on("clientbound-LevelChunkPacket", (packet) => {
 	//     console.log(packet);

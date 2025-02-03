@@ -5,11 +5,10 @@ import { Proto } from "@serenityjs/raknet";
 @Proto(Packet.LevelChunk)
 class LevelChunkPacket extends DataPacket {
 	private static readonly MAX_BLOB_HASHES = 64;
-	private static readonly CLIENT_REQUEST_FULL_COLUMN_FAKE_COUNT = 0xffffffff; // PHP_INT_MAX equivalent
+	private static readonly CLIENT_REQUEST_FULL_COLUMN_FAKE_COUNT = 0xffffffff;
 	private static readonly CLIENT_REQUEST_TRUNCATED_COLUMN_FAKE_COUNT =
-		0xfffffffe; // -2 in unsigned format
+		0xfffffffe;
 
-	// ChunkPosition fields
 	public x!: number;
 	public z!: number;
 
@@ -23,7 +22,7 @@ class LevelChunkPacket extends DataPacket {
 	public highest_subchunk_count?: number;
 
 	public cache_enabled!: boolean;
-	public blobs?: Array<bigint>; // Blob IDs for cache
+	public blobs?: Array<bigint>;
 	public payload!: Buffer;
 
 	public override serialize(): Buffer {

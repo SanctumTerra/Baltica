@@ -49,6 +49,7 @@ import {
 	defaultClientOptions,
 } from "./client-options";
 import { WorkerClient } from "./worker";
+import { AddPaintingPacket } from "../network/packets";
 
 class Client extends Emitter<ClientEvents> {
 	public raknet: RaknetClient | WorkerClient;
@@ -119,6 +120,7 @@ class Client extends Emitter<ClientEvents> {
 					this.sessionReady
 				) {
 					clearInterval(interval);
+					this.emit("connect", advertisement);
 					resolve([advertisement, this.startGamePacket]);
 				}
 			}, 50);
@@ -185,19 +187,35 @@ class Client extends Emitter<ClientEvents> {
 	/** Already decompressed packets */
 	public processPacket(buffer: Buffer) {
 		const id = getPacketId(buffer);
-		if (!Packets[id]) return Logger.warn(`Unknown Game packet ${id}`);
 		let PacketClass = Packets[id];
 		try {
 			if (id === Packet.LevelChunk) {
 				PacketClass = LevelChunkPacket;
 			}
-			if (this.hasListeners(PacketClass.name as PacketNames)) {
-				const packet = new PacketClass(buffer).deserialize();
-				this.emit(PacketClass.name as PacketNames, packet);
+			if ((id as number) === 22) {
+				PacketClass = AddPaintingPacket;
 			}
-			if (this.hasListeners("packet")) {
-				const packet = new PacketClass(buffer).deserialize();
-				this.emit("packet", packet);
+			if (!Packets && !Packets[id])
+				return Logger.warn(`Unknown Game packet ${id}`);
+
+			// console.log('X - ', PacketClass.name, readPacket(this.options.version, buffer));
+
+			let deserializedPacket: DataPacket | undefined;
+			const hasSpecificListener = this.hasListeners(
+				PacketClass.name as PacketNames,
+			);
+			const hasGenericListener = this.hasListeners("packet");
+
+			if (hasSpecificListener || hasGenericListener) {
+				deserializedPacket = new PacketClass(buffer).deserialize();
+
+				if (hasSpecificListener) {
+					this.emit(PacketClass.name as PacketNames, deserializedPacket);
+				}
+
+				if (hasGenericListener) {
+					this.emit("packet", deserializedPacket);
+				}
 			}
 		} catch (error) {
 			Logger.error(`Failed to process packet ${PacketClass.name}`, error);
