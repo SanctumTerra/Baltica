@@ -3,6 +3,7 @@ import {
 	DisconnectPacket,
 	DisconnectReason,
 } from "@serenityjs/protocol";
+import type { LevelChunkPacket } from "../network/level-chunk-packet";
 import type { Client, PacketNames } from "../client";
 import { Emitter } from "../libs";
 import type { Player } from "../server";
@@ -14,11 +15,28 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 	public bridge!: Bridge;
 	public client!: Client;
 	public cacheStatus!: boolean;
+	public postStartGame: boolean;
+	public levelChunkQueue: LevelChunkPacket[];
 
 	constructor(bridge: Bridge, player: Player) {
 		super();
 		this.bridge = bridge;
 		this.player = player;
+		this.postStartGame = false;
+		this.levelChunkQueue = [];
+		this.once("clientbound-StartGamePacket", (packet) => {
+			this.postStartGame = true;
+			for (const chunk of this.levelChunkQueue) {
+				const eventName =
+					"clientbound-LevelChunkPacket" as keyof BridgePlayerEvents & string;
+				this.emit(eventName, chunk);
+				if ("binary" in packet) {
+					packet.binary = [];
+				}
+				const newBuffer = chunk.serialize();
+				this.player.send(newBuffer);
+			}
+		});
 	}
 
 	public prepare(): void {

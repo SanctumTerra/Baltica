@@ -106,6 +106,14 @@ export class Bridge extends Server {
 			`${isClientbound ? "clientbound" : "serverbound"}-${packetName}` as keyof BridgePlayerEvents &
 				string;
 
+		/** Some devices can not handle LevelChunkPacket before StartGamePacket cuz Mojang is Mojang. */
+		if (packetName === "LevelChunkPacket" && !player.postStartGame) {
+			player.levelChunkQueue.push(
+				new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
+			);
+			return;
+		}
+
 		if (
 			!player.hasListeners(eventName) &&
 			packetName !== "ClientCacheStatusPacket"

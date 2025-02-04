@@ -1,5 +1,5 @@
 import { Logger } from "@sanctumterra/raknet";
-import type { TextPacket } from "@serenityjs/protocol";
+import { Commands, type TextPacket } from "@serenityjs/protocol";
 import { DeviceOS } from "../client";
 import { Client } from "../client/client";
 import { ClientCacheStatusPacket } from "../network/client-cache-status";
@@ -23,32 +23,12 @@ client.connect().then(() => {
 	}, 50);
 });
 
+client.on("AvailableCommandsPacket", (packet) => {
+	// console.log(packet.commands.find(cmd => cmd.name === "list")?.overloads[0]);
+});
+
 if (process.execArgv.includes("--inspect")) {
 	client.on("packet", (packet) => {
-		console.log(packet);
-	});
-}
-// 	console.log(packet.constructor.name);
-if (!process.argv.includes("noLog")) {
-	if (!process.argv.includes("pmmp")) {
-		client.on("LevelChunkPacket", (packet) => {
-			console.log(packet);
-		});
-	}
-
-	client.on("AddPaintingPacket", (packet) => {
-		console.log(packet);
-	});
-
-	client.on("DisconnectPacket", (packet) => {
-		console.log(packet);
-	});
-
-	client.on("ClientCacheStatus", (packet) => {
-		console.log(packet);
-	});
-
-	client.on("ResourcePacksInfoPacket", (packet) => {
 		console.log(packet);
 	});
 }
