@@ -1,7 +1,7 @@
 import { createPublicKey } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
 import type { LoginTokens } from "@serenityjs/protocol";
-import { verify } from "jsonwebtoken";
+import { createVerifier } from "fast-jwt";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
@@ -204,12 +204,14 @@ function getX5U(token: string) {
 	return hjson.x5u;
 }
 
-const getDER = (b64: string) =>
-	createPublicKey({
+const getDER = (b64: string) => {
+	const key = createPublicKey({
 		key: Buffer.from(b64, "base64"),
 		format: "der",
 		type: "spki",
 	});
+	return key.export({ format: 'pem', type: 'spki' });
+};
 
 const readAuth = (chain: string[]) => {
 	let authData = {};
@@ -218,21 +220,21 @@ const readAuth = (chain: string[]) => {
 	let verified = false;
 
 	for (const token of chain) {
-		const decoded = verify(token, pubKey, { algorithms: ["ES384"] });
+		const verifier = createVerifier({ 
+			key: pubKey,
+			algorithms: ["ES384"]
+		});
+		const decoded = verifier(token);
 		const x5u = getX5U(token);
 
 		if (x5u === PUBLIC_KEY) {
 			verified = true;
 		}
 
-		// @ts-expect-error Wrong type in Authflow definition
 		pubKey = decoded.identityPublicKey
-			? // @ts-expect-error Wrong type in Authflow definition
-				getDER(decoded.identityPublicKey)
+			? getDER(decoded.identityPublicKey)
 			: x5u;
-		// @ts-expect-error Wrong type in Authflow definition
 		key = decoded.identityPublicKey || key;
-		// @ts-expect-error Wrong type in Authflow definition
 		authData = { ...authData, ...decoded };
 	}
 
@@ -241,7 +243,11 @@ const readAuth = (chain: string[]) => {
 
 const readSkin = (publicKey: string, token: string) => {
 	const pubKey = getDER(publicKey);
-	const decoded = verify(token, pubKey, { algorithms: ["ES384"] });
+	const verifier = createVerifier({ 
+		key: pubKey,
+		algorithms: ["ES384"]
+	});
+	const decoded = verifier(token);
 	return decoded;
 };
 

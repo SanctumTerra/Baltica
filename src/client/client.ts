@@ -134,7 +134,7 @@ class Client extends Emitter<ClientEvents> {
 		const radius = new RequestChunkRadiusPacket();
 		radius.radius = this.options.viewDistance;
 		radius.maxRadius = this.options.viewDistance;
-		this.queue(radius);
+		this.send(radius);
 	}
 
 	private handleSetLocalPlayerAsInitializedPacket(

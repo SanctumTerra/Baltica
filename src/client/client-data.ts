@@ -1,12 +1,7 @@
 import { type KeyExportOptions, KeyObject, createECDH } from "node:crypto";
-import { promisify } from "node:util";
 import { Logger } from "@sanctumterra/raknet";
 import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
-import {
-	type Secret,
-	type SignOptions,
-	sign as signCallback,
-} from "jsonwebtoken";
+import { createSigner } from "fast-jwt";
 import type { Player } from "src/server/player";
 import { v3 as uuidv3 } from "uuid-1345";
 import type { Client } from "./client";
@@ -19,12 +14,6 @@ const algorithm = "ES384";
 const curve = "secp384r1";
 const pem: KeyExportOptions<"pem"> = { format: "pem", type: "sec1" };
 const der: KeyExportOptions<"der"> = { format: "der", type: "spki" };
-
-const signAsync = promisify(signCallback) as unknown as (
-	payload: string | Buffer | object,
-	secretOrPrivateKey: Secret,
-	options?: SignOptions | undefined,
-) => Promise<string>;
 
 class ClientData {
 	public client: Client | Player;
@@ -66,7 +55,7 @@ class ClientData {
 	): Promise<string> {
 		const { clientX509, ecdhKeyPair } = this.loginData;
 		let payload: Record<string, unknown>;
-		let signOptions: SignOptions;
+		let signOptions: Record<string, unknown>;
 
 		if (offline) {
 			payload = {
@@ -97,11 +86,13 @@ class ClientData {
 			};
 		}
 
-		return signAsync(
-			payload,
-			ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-			signOptions,
-		);
+		const privateKeyPem = ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+		const signer = createSigner({
+			...signOptions,
+			key: privateKeyPem,
+		});
+
+		return signer(payload);
 	}
 
 	public async createClientUserChain(privateKey: KeyObject): Promise<string> {
@@ -117,16 +108,22 @@ class ClientData {
 			PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
 			SelfSignedId: ClientData.nextUUID(),
 		};
+		if(privateKey.asymmetricKeyDetails?.namedCurve === "p384") privateKey.asymmetricKeyDetails.namedCurve = "secp384r1"
 
-		return signAsync(
-			payload,
-			privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-			{
-				algorithm,
-				header: { alg: algorithm, x5u: clientX509, typ: undefined },
-				noTimestamp: true,
-			},
-		);
+		Logger.info('Private Key details:', {
+			type: privateKey.type,
+			curve: privateKey.asymmetricKeyDetails?.namedCurve
+		});
+
+		const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+		const signer = createSigner({
+			algorithm,
+			header: { alg: algorithm, x5u: clientX509, typ: undefined },
+			noTimestamp: true,
+			key: privateKeyPem,
+		});
+
+		return signer(payload);
 	}
 
 	public createSharedSecret(
@@ -141,7 +138,10 @@ class ClientData {
 		}
 
 		try {
-			const ecdh = createECDH(curve);
+			const normalizedCurve = curve === "p384" ? "secp384r1" : curve;
+			Logger.info('Creating ECDH with curve:', normalizedCurve);
+			
+			const ecdh = createECDH(normalizedCurve);
 			const privateKeyJwk = privateKey.export({ format: "jwk" }) as {
 				d?: string;
 			};

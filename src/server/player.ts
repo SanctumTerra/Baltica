@@ -20,7 +20,6 @@ import {
 	ServerToClientHandshakePacket,
 	getPacketId,
 } from "@serenityjs/protocol";
-import { sign } from "jsonwebtoken";
 import {
 	type ClientOptions,
 	type PacketNames,
@@ -35,6 +34,7 @@ import { ClientCacheStatusPacket } from "../network/client-cache-status";
 import { PacketEncryptor } from "../network/packet-encryptor";
 import type { Server } from "./server";
 import type { PlayerEvents } from "./server-options";
+import { createSigner } from "fast-jwt";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);
@@ -145,18 +145,17 @@ class Player extends Emitter<PlayerEvents> {
 				.update(this.data.sharedSecret);
 			this.secretKeyBytes = secretHash.digest();
 
-			// @ts-ignore
-			const token = sign(
-				{
-					salt: SALT_BUFFER.toString("base64"),
-					signedToken: this.data.loginData.clientX509,
-				},
-				this.data.loginData.ecdhKeyPair.privateKey,
-				{
-					algorithm: "ES384",
-					header: { x5u: this.data.loginData.clientX509 },
-				},
-			);
+			const privateKeyPem = this.data.loginData.ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+			const signer = createSigner({
+				algorithm: "ES384",
+				header: { alg: "ES384", x5u: this.data.loginData.clientX509 },
+				key: privateKeyPem,
+			});
+
+			const token = signer({
+				salt: SALT_BUFFER.toString("base64"),
+				signedToken: this.data.loginData.clientX509,
+			});
 
 			const handshake = new ServerToClientHandshakePacket();
 			handshake.token = token;

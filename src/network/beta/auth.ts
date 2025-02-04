@@ -302,11 +302,20 @@ interface ChainData {
 }
 
 interface StoredTokens {
-	device_token: string;
-	access_token: string;
-	authorization_token: string;
+	device_token: {
+		token: string;
+		expires_at: number;
+	};
+	access_token: {
+		token: string;
+		expires_at: number;
+		refresh_token: string;
+	};
+	authorization_token: {
+		token: string;
+		expires_at: number;
+	};
 	xbox_user_id: string;
-	expires_at: number;
 	clientX509: string;
 	chainData: string[];
 }
@@ -682,46 +691,136 @@ export class Bedrock {
 		return this.chainData;
 	}
 
+	private async refreshAccessToken(): Promise<OAuth20Token | null> {
+		if (!this.tokens?.access_token?.refresh_token) {
+			return null;
+		}
+
+		const params = new URLSearchParams({
+			client_id: this.clientId,
+			refresh_token: this.tokens.access_token.refresh_token,
+			grant_type: 'refresh_token'
+		});
+
+		const response = await fetch("https://login.live.com/oauth20_token.srf", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded"
+			},
+			body: params
+		});
+
+		if (!response.ok) {
+			return null;
+		}
+
+		return await response.json() as OAuth20Token;
+	}
+
+	private async refreshTokensIfNeeded(): Promise<boolean> {
+		if (!this.tokens) return false;
+
+		const now = Math.floor(Date.now() / 1000);
+		const accessTokenExpiring = this.tokens.access_token.expires_at <= now + 300;
+
+		if (accessTokenExpiring) {
+			const newTokens = await this.refreshAccessToken();
+			if (!newTokens) return false;
+
+			// Update the access token
+			this.tokens.access_token = {
+				token: newTokens.access_token,
+				refresh_token: newTokens.refresh_token,
+				expires_at: now + newTokens.expires_in
+			};
+
+			// Get new authorization token using the refreshed access token
+			try {
+				const { userId, authToken } = await this.sisuAuthorize(
+					newTokens.access_token,
+					this.tokens.device_token.token
+				);
+
+				this.tokens.authorization_token = {
+					token: authToken,
+					expires_at: now + 86400 * 7 // 7 days
+				};
+				this.tokens.xbox_user_id = userId;
+
+				// Save the updated tokens
+				await this.saveTokens(
+					this.tokens.device_token.token,
+					newTokens.access_token,
+					authToken,
+					userId,
+					this.tokens.chainData
+				);
+
+				return true;
+			} catch (error) {
+				if (this.shouldLog()) {
+					console.warn("Failed to refresh authorization token:", error);
+				}
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	async auth(): Promise<boolean> {
 		try {
 			if ((await this.loadTokens()) && this.tokens) {
-				try {
-					await this.authenticateWithMinecraft(
-						this.tokens.xbox_user_id,
-						this.tokens.authorization_token,
-					);
-					return true;
-				} catch (error) {
-					if (this.shouldLog()) {
-						console.log(
-							"Stored tokens are invalid, starting fresh authentication",
+				// Try to refresh tokens first if needed
+				if (await this.refreshTokensIfNeeded()) {
+					try {
+						await this.authenticateWithMinecraft(
+							this.tokens.xbox_user_id,
+							this.tokens.authorization_token.token
 						);
+						return true;
+					} catch (error) {
+						if (this.shouldLog()) {
+							console.log("Failed to authenticate with Minecraft, starting fresh authentication");
+						}
 					}
 				}
 			}
 
 			const deviceCodeData = await this.requestDeviceCode();
 			console.log(
-				`Please enter code ${deviceCodeData.user_code} at ${deviceCodeData.verification_uri}`,
+				`Please enter code ${deviceCodeData.user_code} at ${deviceCodeData.verification_uri}`
 			);
 
 			const tokenData = await this.pollForToken(deviceCodeData.device_code);
-
 			const deviceToken = await this.authenticateDevice();
-
 			const { userId, authToken } = await this.sisuAuthorize(
 				tokenData.access_token,
-				deviceToken,
+				deviceToken
 			);
 
 			const chainData = await this.authenticateWithMinecraft(userId, authToken);
+
+			// Create a temporary tokens object to store the refresh token
+			this.tokens = {
+				device_token: { token: deviceToken, expires_at: 0 },
+				access_token: {
+					token: tokenData.access_token,
+					refresh_token: tokenData.refresh_token, // Store the refresh token
+					expires_at: 0
+				},
+				authorization_token: { token: authToken, expires_at: 0 },
+				xbox_user_id: userId,
+				clientX509: this.clientX509 || "",
+				chainData
+			};
 
 			await this.saveTokens(
 				deviceToken,
 				tokenData.access_token,
 				authToken,
 				userId,
-				chainData,
+				chainData
 			);
 
 			return true;
@@ -751,9 +850,14 @@ export class Bedrock {
 			try {
 				const data = await fs.promises.readFile(this.tokensPath, "utf8");
 				const tokens = JSON.parse(data) as StoredTokens;
-
 				const now = Math.floor(Date.now() / 1000);
-				if (tokens.expires_at > now + 300) {
+
+				// Check each token type independently
+				const deviceValid = tokens.device_token?.expires_at > now + 300;
+				const accessValid = tokens.access_token?.expires_at > now + 300;
+				const authValid = tokens.authorization_token?.expires_at > now + 300;
+
+				if (deviceValid && accessValid && authValid) {
 					this.tokens = tokens;
 					this.chainData = tokens.chainData;
 					if (this.shouldLog()) {
@@ -780,12 +884,22 @@ export class Bedrock {
 		chainData: string[],
 	): Promise<void> {
 		try {
+			const now = Math.floor(Date.now() / 1000);
 			const tokens: StoredTokens = {
-				device_token: deviceToken,
-				access_token: accessToken,
-				authorization_token: authToken,
+				device_token: {
+					token: deviceToken,
+					expires_at: now + 86400 * 14, // 14 days for device token
+				},
+				access_token: {
+					token: accessToken,
+					refresh_token: this.tokens?.access_token?.refresh_token || "",
+					expires_at: now + 86400, // 24 hours for access token
+				},
+				authorization_token: {
+					token: authToken,
+					expires_at: now + 86400 * 7, // 7 days for auth token
+				},
 				xbox_user_id: userId,
-				expires_at: Math.floor(Date.now() / 1000) + 86400,
 				clientX509: this.clientX509 || "",
 				chainData,
 			};

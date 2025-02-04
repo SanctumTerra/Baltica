@@ -1,10 +1,9 @@
-import type { Player } from "src/server/player";
+import type { Player } from "../../server/player";
 import type { Client } from "../client";
 import { ClientData } from "../client-data";
 import { DeviceOS } from "../client-options";
 import type { AnimatedImageData, PersonaPieces, PieceTintColors } from "./skin";
 import * as skin from "./skin/Skin.json";
-import { InputMode } from "@serenityjs/protocol";
 
 export type Payload = {
 	AnimatedImageData: AnimatedImageData[];

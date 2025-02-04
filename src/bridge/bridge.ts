@@ -152,7 +152,8 @@ export class Bridge extends Server {
 			}
 
 			const newBuffer = packet.serialize();
-			sender.send(buffer.equals(newBuffer) ? buffer : newBuffer);
+			sender.send(newBuffer);
+			// sender.send(buffer.equals(newBuffer) ? buffer : newBuffer);
 		} catch (e) {
 			console.error(`Failed to process ${packetName}`, e);
 			sender.send(buffer);

@@ -30,9 +30,9 @@ bridge.on("connect", (player) => {
 		// packet.modified = true;
 	});
 
-	player.on("serverbound-PlayerAuthInputPacket", (packet) => {
-		packet.inputData.setFlag(InputData.StartSwimming, true);
-	});
+	// player.on("serverbound-PlayerAuthInputPacket", (packet) => {
+	// 	packet.inputData.setFlag(InputData.StartSwimming, true);
+	// });
 
 	player.on("clientbound-AvailableCommandsPacket", (packet) => {
 		const symbol =

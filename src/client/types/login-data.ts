@@ -19,7 +19,7 @@ type LoginData = {
 
 export const prepareLoginData = (): LoginData => {
 	const ecdhKeyPair = generateKeyPairSync("ec", { namedCurve: curve });
-	const loginData = {
+	const loginData: LoginData = {
 		ecdhKeyPair: ecdhKeyPair,
 		publicKeyDER: Buffer.alloc(0),
 		privateKeyPEM: "",
