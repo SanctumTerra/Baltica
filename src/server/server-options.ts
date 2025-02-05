@@ -35,7 +35,7 @@ export const defaultServerOptions: ServerOptions = {
 	worker: true,
 	maxPlayers: 100,
 	compressionMethod: CompressionMethod.Zlib,
-	compressionThreshold: 1,
-	compressionLevel: 7,
+	compressionThreshold: 512,
+	compressionLevel: 4,
 	levelName: "SanctumTerra Server",
 };

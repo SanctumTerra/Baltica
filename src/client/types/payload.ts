@@ -2,7 +2,11 @@ import type { Player } from "../../server/player";
 import type { Client } from "../client";
 import { ClientData } from "../client-data";
 import { DeviceOS } from "../client-options";
-import type { AnimatedImageData, PersonaPieces, PieceTintColors } from "./skin";
+import type {
+	AnimatedImageData,
+	PersonaPieces,
+	PieceTintColors,
+} from "./skin/Skin.d";
 import * as skin from "./skin/Skin.json";
 
 export type Payload = {

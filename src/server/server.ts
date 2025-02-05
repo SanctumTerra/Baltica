@@ -33,21 +33,21 @@ export class Server extends Emitter<ServerEvents> {
 		});
 	}
 
+	private getConnectionKey(connection: Connection): string {
+		const addr = connection.getAddress();
+		return `${addr.address}:${addr.port}`;
+	}
+
 	public start() {
 		this.raknet.on("connect", (connection) => {
 			if (!(connection instanceof Connection))
 				throw new Error("Connection is not instance of Connection");
+
+			const connectionKey = this.getConnectionKey(connection);
+			if (this.connections.has(connectionKey)) return;
+
 			const player = new Player(this, connection);
-			if (
-				this.connections.has(
-					`${connection.getAddress().address}:${connection.getAddress().port}`,
-				)
-			)
-				return;
-			this.connections.set(
-				`${connection.getAddress().address}:${connection.getAddress().port}`,
-				player,
-			);
+			this.connections.set(connectionKey, player);
 			this.emit("playerConnect", player);
 			Logger.info("Player connected: ", connection.getAddress());
 		});
@@ -56,18 +56,10 @@ export class Server extends Emitter<ServerEvents> {
 	}
 
 	public onDisconnect(player: Player) {
-		Logger.info(
-			"Player disconnected: ",
-			player.profile.name ??
-				`${player.connection.getAddress().address}:${player.connection.getAddress().port}`,
-		);
-		this.emit(
-			"disconnect",
-			player.profile.name ??
-				`${player.connection.getAddress().address}:${player.connection.getAddress().port}`,
-		);
-		this.connections.delete(
-			`${player.connection.getAddress().address}:${player.connection.getAddress().port}`,
-		);
+		const displayName =
+			player.profile.name ?? this.getConnectionKey(player.connection);
+		Logger.info("Player disconnected: ", displayName);
+		this.emit("disconnect", displayName);
+		this.connections.delete(this.getConnectionKey(player.connection));
 	}
 }

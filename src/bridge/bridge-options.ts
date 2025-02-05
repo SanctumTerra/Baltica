@@ -9,13 +9,18 @@ import {
 export type BridgePlayerEvents = {
 	[K in PacketNames as `clientbound-${K}`]: [
 		packet: InstanceType<(typeof Protocol)[K]>,
+		cancelled: boolean,
 	];
 } & {
 	[K in PacketNames as `serverbound-${K}`]: [
 		packet: InstanceType<(typeof Protocol)[K]>,
+		cancelled: boolean,
 	];
 } & {
-	"serverbound-ClientCacheStatusPacket": [packet: ClientCacheStatusPacket];
+	"serverbound-ClientCacheStatusPacket": [
+		packet: ClientCacheStatusPacket,
+		cancelled: boolean,
+	];
 };
 
 export type BridgeOptions = ServerOptions & {

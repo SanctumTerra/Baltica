@@ -29,7 +29,7 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 			for (const chunk of this.levelChunkQueue) {
 				const eventName =
 					"clientbound-LevelChunkPacket" as keyof BridgePlayerEvents & string;
-				this.emit(eventName, chunk);
+				this.emit(eventName, chunk, false);
 				if ("binary" in packet) {
 					packet.binary = [];
 				}

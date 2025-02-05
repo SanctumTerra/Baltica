@@ -43,6 +43,15 @@ PLAY_STATUS_LOGIN_SUCCESS.status = PlayStatus.LoginSuccess;
 const PLAY_STATUS_LOGIN_SUCCESS_BUFFER = PLAY_STATUS_LOGIN_SUCCESS.serialize();
 
 class Player extends Emitter<PlayerEvents> {
+	private static readonly PACKET_CACHE_STATUS_ID = 0x81;
+	private static readonly DEFAULT_NETWORK_SETTINGS = (() => {
+		const settings = new NetworkSettingsPacket();
+		settings.clientScalar = 0;
+		settings.clientThrottle = false;
+		settings.clientThreshold = 0;
+		return settings;
+	})();
+
 	public server: Server;
 	public data: ClientData;
 	public profile!: Profile;
@@ -70,13 +79,9 @@ class Player extends Emitter<PlayerEvents> {
 	}
 
 	private initializeStaticPackets() {
-		const settings = new NetworkSettingsPacket();
-		const options = this.server.options;
-		settings.compressionThreshold = options.compressionThreshold;
-		settings.compressionMethod = options.compressionMethod;
-		settings.clientScalar = 0;
-		settings.clientThrottle = false;
-		settings.clientThreshold = 0;
+		const settings = Player.DEFAULT_NETWORK_SETTINGS;
+		settings.compressionThreshold = this.server.options.compressionThreshold;
+		settings.compressionMethod = this.server.options.compressionMethod;
 		this.preSerializedPackets.set(NetworkSettingsPacket, settings.serialize());
 	}
 
@@ -94,13 +99,10 @@ class Player extends Emitter<PlayerEvents> {
 			if (preSerialized) {
 				this.send(preSerialized);
 			} else {
-				const settings = new NetworkSettingsPacket();
+				const settings = Player.DEFAULT_NETWORK_SETTINGS;
 				settings.compressionThreshold =
 					this.server.options.compressionThreshold;
 				settings.compressionMethod = this.server.options.compressionMethod;
-				settings.clientScalar = 0;
-				settings.clientThrottle = false;
-				settings.clientThreshold = 0;
 				this.send(settings);
 			}
 
@@ -144,8 +146,13 @@ class Player extends Emitter<PlayerEvents> {
 				.update(SALT_BUFFER)
 				.update(this.data.sharedSecret);
 			this.secretKeyBytes = secretHash.digest();
+			this.iv = this.secretKeyBytes.slice(0, 16);
 
-			const privateKeyPem = this.data.loginData.ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+			const privateKeyPem = this.data.loginData.ecdhKeyPair.privateKey.export({
+				format: "pem",
+				type: "pkcs8",
+			}) as string;
+
 			const signer = createSigner({
 				algorithm: "ES384",
 				header: { alg: "ES384", x5u: this.data.loginData.clientX509 },
@@ -161,9 +168,7 @@ class Player extends Emitter<PlayerEvents> {
 			handshake.token = token;
 			this.send(handshake);
 
-			const iv = this.secretKeyBytes.slice(0, 16);
-			this.iv = iv;
-			this.startEncryption(iv);
+			this.startEncryption(this.iv);
 
 			this.emit("login");
 			Logger.debug(`Enabling Encryption for ${this.profile.name}`);
@@ -214,8 +219,7 @@ class Player extends Emitter<PlayerEvents> {
 
 	public processPacket(packet: Buffer) {
 		const id = packet.readUInt8(0);
-		if (id === 0x81) {
-			// 0x81 is hex for 129
+		if (id === Player.PACKET_CACHE_STATUS_ID) {
 			Logger.debug("Received ClientCacheStatusPacket");
 			const instance = new ClientCacheStatusPacket(packet);
 			instance.deserialize();
@@ -232,15 +236,15 @@ class Player extends Emitter<PlayerEvents> {
 
 		const instance = new PacketClass(packet);
 		instance.deserialize();
-		this.emit(PacketClass.name as PacketNames, instance);
 
 		if (this.hasListeners("packet")) {
 			this.emit("packet", instance);
 		}
+		this.emit(PacketClass.name as PacketNames, instance);
 	}
 
-	public handle(packet: Buffer) {
-		const packets = this.packetCompressor.decompress(packet);
+	public async handle(packet: Buffer) {
+		const packets = await this.packetCompressor.decompress(packet);
 		let i = 0;
 		while (i < packets.length) {
 			this.processPacket(packets[i]);

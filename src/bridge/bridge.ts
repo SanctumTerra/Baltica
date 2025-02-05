@@ -40,6 +40,7 @@ export class Bridge extends Server {
 	public options: BridgeOptions;
 	private clients: Map<string, BridgePlayer> = new Map();
 	private packetClassCache: Map<number, PacketConstructor> = new Map();
+	private packetSerializationCache: Map<string, Buffer> = new Map();
 	private readonly debugLog = false;
 
 	constructor(options: Partial<BridgeOptions> = {}) {
@@ -95,8 +96,7 @@ export class Bridge extends Server {
 		const id = getPacketId(buffer);
 		const PacketClass = Packets[id as keyof typeof Packets];
 
-		// @ts-ignore
-		if (!PacketClass && id !== CLIENT_CACHE_STATUS_ID) {
+		if (!PacketClass && (id as number) !== CLIENT_CACHE_STATUS_ID) {
 			sender.send(buffer);
 			return;
 		}
@@ -106,7 +106,6 @@ export class Bridge extends Server {
 			`${isClientbound ? "clientbound" : "serverbound"}-${packetName}` as keyof BridgePlayerEvents &
 				string;
 
-		/** Some devices can not handle LevelChunkPacket before StartGamePacket cuz Mojang is Mojang. */
 		if (packetName === "LevelChunkPacket" && !player.postStartGame) {
 			player.levelChunkQueue.push(
 				new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
@@ -135,25 +134,31 @@ export class Bridge extends Server {
 				);
 			}
 
-			const packet = new CachedPacketClass(
-				buffer,
-			).deserialize() as ProtocolPacket;
+			const cacheKey = `${id}-${buffer.toString("hex")}`;
+			let newBuffer = this.packetSerializationCache.get(cacheKey);
 
-			if (packet instanceof ClientCacheStatusPacket) {
-				packet.supported = false;
-				Logger.warn("Ignoring ClientCacheStatusPacket");
-				return;
+			if (!newBuffer) {
+				const packet = new CachedPacketClass(
+					buffer,
+				).deserialize() as ProtocolPacket;
+
+				if (packet instanceof ClientCacheStatusPacket) {
+					packet.supported = false;
+					Logger.warn("Ignoring ClientCacheStatusPacket");
+					return;
+				}
+				// biome-ignore lint/style/useConst: <explanation>
+				let cancelled = false;
+				player.emit(eventName, packet, cancelled);
+				if (cancelled) return;
+				if ("binary" in packet) {
+					packet.binary = [];
+				}
+				newBuffer = packet.serialize();
+				this.packetSerializationCache.set(cacheKey, newBuffer);
 			}
 
-			player.emit(eventName, packet);
-
-			if ("binary" in packet) {
-				packet.binary = [];
-			}
-
-			const newBuffer = packet.serialize();
 			sender.send(newBuffer);
-			// sender.send(buffer.equals(newBuffer) ? buffer : newBuffer);
 		} catch (e) {
 			console.error(`Failed to process ${packetName}`, e);
 			sender.send(buffer);

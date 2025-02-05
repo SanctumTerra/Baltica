@@ -86,7 +86,10 @@ class ClientData {
 			};
 		}
 
-		const privateKeyPem = ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+		const privateKeyPem = ecdhKeyPair.privateKey.export({
+			format: "pem",
+			type: "pkcs8",
+		}) as string;
 		const signer = createSigner({
 			...signOptions,
 			key: privateKeyPem,
@@ -108,14 +111,19 @@ class ClientData {
 			PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
 			SelfSignedId: ClientData.nextUUID(),
 		};
-		if(privateKey.asymmetricKeyDetails?.namedCurve === "p384") privateKey.asymmetricKeyDetails.namedCurve = "secp384r1"
+		if (privateKey.asymmetricKeyDetails?.namedCurve === "p384")
+			privateKey.asymmetricKeyDetails.namedCurve = "secp384r1";
 
-		Logger.info('Private Key details:', {
-			type: privateKey.type,
-			curve: privateKey.asymmetricKeyDetails?.namedCurve
-		});
+		// Deno sucks.
+		// Logger.info('Private Key details:', {
+		// 	type: privateKey.type,
+		// 	curve: privateKey.asymmetricKeyDetails?.namedCurve
+		// });
 
-		const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }) as string;
+		const privateKeyPem = privateKey.export({
+			format: "pem",
+			type: "pkcs8",
+		}) as string;
 		const signer = createSigner({
 			algorithm,
 			header: { alg: algorithm, x5u: clientX509, typ: undefined },
@@ -139,8 +147,7 @@ class ClientData {
 
 		try {
 			const normalizedCurve = curve === "p384" ? "secp384r1" : curve;
-			Logger.info('Creating ECDH with curve:', normalizedCurve);
-			
+
 			const ecdh = createECDH(normalizedCurve);
 			const privateKeyJwk = privateKey.export({ format: "jwk" }) as {
 				d?: string;

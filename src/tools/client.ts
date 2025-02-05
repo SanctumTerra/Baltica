@@ -32,7 +32,6 @@ if (process.execArgv.includes("--inspect")) {
 		console.log(packet);
 	});
 }
-
 client.on("TextPacket", handleTextPacket);
 async function handleTextPacket(packet: TextPacket): Promise<void> {
 	if (!packet.parameters) return Logger.chat(packet.message);
@@ -52,3 +51,7 @@ async function handleTextPacket(packet: TextPacket): Promise<void> {
 	);
 	handler ? handler[1]() : console.log(packet.message);
 }
+
+client.on("DisconnectPacket", (packet) => {
+	console.log(packet);
+});

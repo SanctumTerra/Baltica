@@ -536,6 +536,7 @@ export class Bedrock {
 			{
 				method: "POST",
 				headers: {
+					"Cache-Control": "no-store, must-revalidate, no-cache",
 					"Content-Type": "application/json",
 					"x-xbl-contract-version": "1",
 					Signature: signature,
@@ -668,8 +669,7 @@ export class Bedrock {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					"User-Agent": "MCPE/Android",
-					"Client-Version": this.clientVersion,
+					"User-Agent": "MCPE/UWP",
 					Authorization: `XBL3.0 x=${userId};${authToken}`,
 				},
 				body: JSON.stringify({
@@ -699,29 +699,30 @@ export class Bedrock {
 		const params = new URLSearchParams({
 			client_id: this.clientId,
 			refresh_token: this.tokens.access_token.refresh_token,
-			grant_type: 'refresh_token'
+			grant_type: "refresh_token",
 		});
 
 		const response = await fetch("https://login.live.com/oauth20_token.srf", {
 			method: "POST",
 			headers: {
-				"Content-Type": "application/x-www-form-urlencoded"
+				"Content-Type": "application/x-www-form-urlencoded",
 			},
-			body: params
+			body: params,
 		});
 
 		if (!response.ok) {
 			return null;
 		}
 
-		return await response.json() as OAuth20Token;
+		return (await response.json()) as OAuth20Token;
 	}
 
 	private async refreshTokensIfNeeded(): Promise<boolean> {
 		if (!this.tokens) return false;
 
 		const now = Math.floor(Date.now() / 1000);
-		const accessTokenExpiring = this.tokens.access_token.expires_at <= now + 300;
+		const accessTokenExpiring =
+			this.tokens.access_token.expires_at <= now + 300;
 
 		if (accessTokenExpiring) {
 			const newTokens = await this.refreshAccessToken();
@@ -731,19 +732,19 @@ export class Bedrock {
 			this.tokens.access_token = {
 				token: newTokens.access_token,
 				refresh_token: newTokens.refresh_token,
-				expires_at: now + newTokens.expires_in
+				expires_at: now + newTokens.expires_in,
 			};
 
 			// Get new authorization token using the refreshed access token
 			try {
 				const { userId, authToken } = await this.sisuAuthorize(
 					newTokens.access_token,
-					this.tokens.device_token.token
+					this.tokens.device_token.token,
 				);
 
 				this.tokens.authorization_token = {
 					token: authToken,
-					expires_at: now + 86400 * 7 // 7 days
+					expires_at: now + 86400 * 7, // 7 days
 				};
 				this.tokens.xbox_user_id = userId;
 
@@ -753,7 +754,7 @@ export class Bedrock {
 					newTokens.access_token,
 					authToken,
 					userId,
-					this.tokens.chainData
+					this.tokens.chainData,
 				);
 
 				return true;
@@ -776,12 +777,14 @@ export class Bedrock {
 					try {
 						await this.authenticateWithMinecraft(
 							this.tokens.xbox_user_id,
-							this.tokens.authorization_token.token
+							this.tokens.authorization_token.token,
 						);
 						return true;
 					} catch (error) {
 						if (this.shouldLog()) {
-							console.log("Failed to authenticate with Minecraft, starting fresh authentication");
+							console.log(
+								"Failed to authenticate with Minecraft, starting fresh authentication",
+							);
 						}
 					}
 				}
@@ -789,14 +792,14 @@ export class Bedrock {
 
 			const deviceCodeData = await this.requestDeviceCode();
 			console.log(
-				`Please enter code ${deviceCodeData.user_code} at ${deviceCodeData.verification_uri}`
+				`Please enter code ${deviceCodeData.user_code} at ${deviceCodeData.verification_uri}`,
 			);
 
 			const tokenData = await this.pollForToken(deviceCodeData.device_code);
 			const deviceToken = await this.authenticateDevice();
 			const { userId, authToken } = await this.sisuAuthorize(
 				tokenData.access_token,
-				deviceToken
+				deviceToken,
 			);
 
 			const chainData = await this.authenticateWithMinecraft(userId, authToken);
@@ -807,12 +810,12 @@ export class Bedrock {
 				access_token: {
 					token: tokenData.access_token,
 					refresh_token: tokenData.refresh_token, // Store the refresh token
-					expires_at: 0
+					expires_at: 0,
 				},
 				authorization_token: { token: authToken, expires_at: 0 },
 				xbox_user_id: userId,
 				clientX509: this.clientX509 || "",
-				chainData
+				chainData,
 			};
 
 			await this.saveTokens(
@@ -820,7 +823,7 @@ export class Bedrock {
 				tokenData.access_token,
 				authToken,
 				userId,
-				chainData
+				chainData,
 			);
 
 			return true;

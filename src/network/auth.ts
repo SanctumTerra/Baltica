@@ -210,7 +210,7 @@ const getDER = (b64: string) => {
 		format: "der",
 		type: "spki",
 	});
-	return key.export({ format: 'pem', type: 'spki' });
+	return key.export({ format: "pem", type: "spki" });
 };
 
 const readAuth = (chain: string[]) => {
@@ -220,9 +220,9 @@ const readAuth = (chain: string[]) => {
 	let verified = false;
 
 	for (const token of chain) {
-		const verifier = createVerifier({ 
+		const verifier = createVerifier({
 			key: pubKey,
-			algorithms: ["ES384"]
+			algorithms: ["ES384"],
 		});
 		const decoded = verifier(token);
 		const x5u = getX5U(token);
@@ -243,9 +243,9 @@ const readAuth = (chain: string[]) => {
 
 const readSkin = (publicKey: string, token: string) => {
 	const pubKey = getDER(publicKey);
-	const verifier = createVerifier({ 
+	const verifier = createVerifier({
 		key: pubKey,
-		algorithms: ["ES384"]
+		algorithms: ["ES384"],
 	});
 	const decoded = verifier(token);
 	return decoded;
