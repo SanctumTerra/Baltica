@@ -28,7 +28,6 @@
 		"elliptic": "^6.6.1",
 		"fast-jwt": "^5.0.5",
 		"prismarine-auth": "^2.6.0",
-		"snappy": "^7.2.2",
 		"uuid-1345": "^1.0.2"
 	},
 	"devDependencies": {
