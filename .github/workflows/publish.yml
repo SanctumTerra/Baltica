@@ -82,7 +82,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create v${{ steps.package-info.outputs.version }} \
-            --title "Release v${{ steps.package-info.outputs.version }} for Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            --title "Release v${{ steps.package-info.outputs.version }} for Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}" \
             --notes "Release for Baltica v${{ steps.package-info.outputs.version }}
-            Compatible with Minecraft ${{ steps.package-info.outputs.minecraft }}" \
+            Compatible with Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}" \
             --target ${{ github.sha }}
