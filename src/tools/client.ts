@@ -4,12 +4,49 @@ import { DeviceOS } from "../client";
 import { Client } from "../client/client";
 import { ClientCacheStatusPacket } from "../network/client-cache-status";
 
+let isDisconnecting = false;
+
+// Cleanup function to ensure proper cleanup
+function cleanup() {
+	if (isDisconnecting) return;
+	isDisconnecting = true;
+
+	try {
+		client.disconnect();
+		// Remove all process event listeners
+		process.removeAllListeners("SIGINT");
+		process.removeAllListeners("SIGTERM");
+		process.removeAllListeners("beforeExit");
+		process.removeAllListeners("exit");
+		process.removeAllListeners("uncaughtException");
+		process.removeAllListeners("unhandledRejection");
+	} catch (error) {
+		console.error("Error during cleanup:", error);
+	}
+}
+
+// Handle process termination signals
+process.on("SIGINT", cleanup);
+process.on("SIGTERM", cleanup);
+process.on("beforeExit", cleanup);
+
+// Handle uncaught errors
+process.on("uncaughtException", (error) => {
+	console.error("Uncaught exception:", error);
+	cleanup();
+});
+
+process.on("unhandledRejection", (error) => {
+	console.error("Unhandled rejection:", error);
+	cleanup();
+});
+
 const client = new Client({
 	host: "127.0.0.1",
 	port: 19132,
 	offline: process.argv.includes("offline"),
 	version: "1.21.50",
-	worker: true,
+	// worker: true,
 	deviceOS: DeviceOS.Win10,
 	betaAuth: process.argv.includes("betaAuth"),
 });
@@ -17,10 +54,10 @@ const client = new Client({
 console.time("client.connect");
 client.connect().then(() => {
 	console.timeEnd("client.connect");
-	setInterval(() => {
-		// It does not freeze anymore :D
-		// client.sendMessage(`Raknet is working! ${Date.now()}`);
-	}, 50);
+	// setInterval(() => {
+	// It does not freeze anymore :D
+	// client.sendMessage(`Raknet is working! ${Date.now()}`);
+	// }, 50);
 });
 
 client.on("AvailableCommandsPacket", (packet) => {
@@ -45,7 +82,10 @@ async function handleTextPacket(packet: TextPacket): Promise<void> {
 			Logger.chat(`§e${param1} §eleft the game§r`),
 		"chat.type.announcement": () => Logger.chat(`§d[${param1}] ${param2}§r`),
 	};
-
+	if (packet?.parameters?.[1]?.includes("Disconnected")) {
+		cleanup();
+		return;
+	}
 	const handler = Object.entries(messageTypes).find(([key]) =>
 		packet.message.includes(key),
 	);
@@ -54,4 +94,5 @@ async function handleTextPacket(packet: TextPacket): Promise<void> {
 
 client.on("DisconnectPacket", (packet) => {
 	console.log(packet);
+	cleanup();
 });

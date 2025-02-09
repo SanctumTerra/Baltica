@@ -98,6 +98,12 @@ class WorkerClient extends Emitter<ClientEvents> {
 		this.removeAllListeners();
 	}
 
+	public cleanup() {
+		this.removeAllListeners();
+		this._worker?.postMessage({ type: "cleanup" });
+		this._worker = undefined;
+	}
+
 	public frameAndSend(payload: Buffer, priority: Priority = Priority.Normal) {
 		if (!this._worker) return;
 		this._worker.postMessage({ type: "frameAndSend", payload, priority });

@@ -28,6 +28,7 @@ export type BridgeOptions = ServerOptions & {
 		host: string;
 		port: number;
 	};
+	offline: boolean;
 };
 
 export const defaultBridgeOptions: BridgeOptions = {
@@ -36,4 +37,5 @@ export const defaultBridgeOptions: BridgeOptions = {
 		host: "127.0.0.1",
 		port: 19132,
 	},
+	offline: false,
 };

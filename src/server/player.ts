@@ -4,6 +4,7 @@ import {
 	Logger,
 	Priority,
 	Connection as RakConnection,
+	Status,
 } from "@sanctumterra/raknet";
 import {
 	CompressionMethod,
@@ -65,6 +66,7 @@ class Player extends Emitter<PlayerEvents> {
 	public _encryptionEnabled = false;
 	public _compressionEnabled = false;
 	private preSerializedPackets = new Map<unknown, Buffer>();
+	public status: Status = Status.Disconnected;
 
 	constructor(server: Server, connection: RakConnection) {
 		super();
@@ -91,8 +93,11 @@ class Player extends Emitter<PlayerEvents> {
 
 		this.connection.on("encapsulated", this.handle.bind(this));
 		this.connection.on("disconnect", () => this.server.onDisconnect(this));
-
+		this.once("SetLocalPlayerAsInitializedPacket", () => {
+			this.status = Status.Connected;
+		});
 		this.once("RequestNetworkSettingsPacket", () => {
+			this.status = Status.Connecting;
 			const preSerialized = this.preSerializedPackets.get(
 				NetworkSettingsPacket,
 			);
@@ -190,6 +195,7 @@ class Player extends Emitter<PlayerEvents> {
 		packet: DataPacket | Buffer,
 		priority: Priority = Priority.Normal,
 	) {
+		if (this.status === Status.Disconnected) return;
 		let serialized: Buffer;
 		if (packet instanceof DataPacket) {
 			const preSerialized = this.preSerializedPackets.get(packet.constructor);

@@ -6,11 +6,17 @@ import {
 import { Emitter } from "../libs";
 import { Player } from "./player";
 import { type ServerOptions, defaultServerOptions } from "./server-options";
+import { disconnect } from "node:process";
+import {
+	DisconnectMessage,
+	DisconnectPacket,
+	DisconnectReason,
+} from "@serenityjs/protocol";
 
 export interface ServerEvents {
 	connection: [Connection];
 	playerConnect: [Player];
-	disconnect: [string];
+	disconnect: [string, Player];
 }
 
 export class Server extends Emitter<ServerEvents> {
@@ -49,7 +55,8 @@ export class Server extends Emitter<ServerEvents> {
 			const player = new Player(this, connection);
 			this.connections.set(connectionKey, player);
 			this.emit("playerConnect", player);
-			Logger.info("Player connected: ", connection.getAddress());
+			const { address, port } = connection.getAddress();
+			Logger.info("Player connected from: ", `${address}:${port}`);
 		});
 
 		this.raknet.start();
@@ -59,7 +66,7 @@ export class Server extends Emitter<ServerEvents> {
 		const displayName =
 			player.profile.name ?? this.getConnectionKey(player.connection);
 		Logger.info("Player disconnected: ", displayName);
-		this.emit("disconnect", displayName);
+		this.emit("disconnect", displayName, player);
 		this.connections.delete(this.getConnectionKey(player.connection));
 	}
 }

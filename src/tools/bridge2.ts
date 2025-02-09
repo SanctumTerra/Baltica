@@ -16,11 +16,14 @@ import { Logger } from "@sanctumterra/raknet";
 import { inspect } from "node:util";
 
 const bridge = new Bridge({
+	host: "0.0.0.0",
 	port: 19133,
 	destination: {
 		host: "127.0.0.1",
+		// host: "zeqa.net",
 		port: 19132,
 	},
+	offline: true,
 });
 
 bridge.on("connect", (player) => {
@@ -57,10 +60,10 @@ function handleSetCommandsEnabled(
 }
 
 function handleStartGame(player: BridgePlayer, packet: StartGamePacket) {
-	console.log(
-		"Player started game: ",
-		player.player?.profile?.name ?? "Unknown",
-	);
+	// console.log(
+	// 	"Player started game: ",
+	// 	player.player?.profile?.name ?? "Unknown",
+	// );
 	packet.achievementsDisabled = true;
 	packet.hardcore = true;
 	packet.commandsEnabled = true;
@@ -130,7 +133,7 @@ function pushCommand(player: BridgePlayer, packet: AvailableCommandsPacket) {
 
 	// packet.enumConstraints = [];
 
-	console.log(inspect(packet, { depth: null, colors: true }));
+	// console.log(inspect(packet, { depth: null, colors: true }));
 	packet.commands.push(command);
 }
 

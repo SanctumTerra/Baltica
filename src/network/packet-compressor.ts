@@ -2,7 +2,6 @@ import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { CompressionMethod, Framer } from "@serenityjs/protocol";
 import type { Player } from "src/server/player";
 import type { Client } from "../client/client";
-import { PacketEncryptor } from "./packet-encryptor";
 
 class PacketCompressor {
 	private client: Client | Player;

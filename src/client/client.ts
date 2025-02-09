@@ -50,6 +50,7 @@ import {
 } from "./client-options";
 import { WorkerClient } from "./worker";
 import { AddPaintingPacket } from "../network/packets";
+import DisconnectionNotification from "@sanctumterra/raknet/dist/proto/packets/disconnect";
 
 class Client extends Emitter<ClientEvents> {
 	public raknet: RaknetClient | WorkerClient;
@@ -100,7 +101,7 @@ class Client extends Emitter<ClientEvents> {
 		while (!this.sessionReady) {
 			await new Promise((resolve) => setTimeout(resolve, 10));
 		}
-
+		this.status = Status.Connecting;
 		this.packetCompressor = new PacketCompressor(this);
 		this.listen();
 		const advertisement = await this.raknet.connect();
@@ -159,6 +160,7 @@ class Client extends Emitter<ClientEvents> {
 		priority: Priority = Priority.Normal,
 	) {
 		try {
+			if (this.status === Status.Disconnected) return;
 			const serialized =
 				packet instanceof DataPacket ? packet.serialize() : packet;
 			const compressed = this.packetCompressor.compress(
@@ -323,6 +325,26 @@ class Client extends Emitter<ClientEvents> {
 	public startEncryption(iv: Buffer) {
 		this.packetEncryptor = new PacketEncryptor(this, iv);
 		this._encryptionEnabled = true;
+	}
+
+	public disconnect() {
+		const rakDisconnect = new DisconnectionNotification();
+		const frame = new Frame();
+		frame.orderChannel = 0;
+		frame.payload = rakDisconnect.serialize();
+		this.raknet.sendFrame(frame, Priority.Immediate);
+		this.status = Status.Disconnected;
+
+		this.removeAllListeners();
+		this.raknet.cleanup();
+		if (this.raknet instanceof RaknetClient) {
+			this.raknet.removeAll();
+			this.raknet.removeAllAfter();
+			this.raknet.removeAllBefore();
+		} else {
+			this.raknet.dispose();
+		}
+		return;
 	}
 
 	public sendMessage(text: string): void {

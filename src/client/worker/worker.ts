@@ -99,6 +99,9 @@ function main() {
 				frame.splitId = evt.frame.splitId;
 				client.sendFrame(frame, evt.priority);
 			}
+			if (evt.type === "cleanup") {
+				client?.cleanup();
+			}
 			if (evt.type === "frameAndSend") {
 				if (!client) return;
 				client.frameAndSend(evt.payload, evt.priority);

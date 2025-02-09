@@ -1,4 +1,4 @@
-import { Connection, Logger, Priority } from "@sanctumterra/raknet";
+import { Connection, Frame, Logger, Priority } from "@sanctumterra/raknet";
 import {
 	type DataPacket,
 	type Packet,
@@ -6,7 +6,7 @@ import {
 	PlayStatus,
 	getPacketId,
 } from "@serenityjs/protocol";
-import type * as Protocol from "@serenityjs/protocol";
+import * as Protocol from "@serenityjs/protocol";
 import { Client, type PacketNames } from "../client";
 import type { ForceArray } from "../libs";
 import { ClientCacheStatusPacket } from "../network/client-cache-status";
@@ -18,17 +18,16 @@ import {
 	defaultBridgeOptions,
 } from "./bridge-options";
 import { BridgePlayer } from "./bridge-player";
+import DisconnectionNotification from "@sanctumterra/raknet/dist/proto/packets/disconnect";
 
 type ProtocolPacket = DataPacket;
 
-interface PacketConstructor<T extends ProtocolPacket = ProtocolPacket> {
-	new (
-		buffer: Buffer,
-	): T & {
-		deserialize(): T;
-		serialize(): Buffer;
-	};
-}
+type PacketConstructor<T extends ProtocolPacket = ProtocolPacket> = new (
+	buffer: Buffer,
+) => T & {
+	deserialize(): T;
+	serialize(): Buffer;
+};
 
 type BridgeSpecificEvents = {
 	connect: [BridgePlayer];
@@ -38,9 +37,9 @@ type BridgeEvents = ServerEvents & BridgeSpecificEvents;
 
 export class Bridge extends Server {
 	public options: BridgeOptions;
-	private clients: Map<string, BridgePlayer> = new Map();
-	private packetClassCache: Map<number, PacketConstructor> = new Map();
-	private packetSerializationCache: Map<string, Buffer> = new Map();
+	private clients = new Map<string, BridgePlayer>();
+	private packetClassCache = new Map<number, PacketConstructor>();
+	private packetSerializationCache = new Map<string, Buffer>();
 	private readonly debugLog = false;
 
 	constructor(options: Partial<BridgeOptions> = {}) {
@@ -57,8 +56,8 @@ export class Bridge extends Server {
 			ClientCacheStatusPacket as unknown as PacketConstructor,
 		);
 
-		if ("id" in LevelChunkPacket) {
-			const levelChunkId = (LevelChunkPacket as unknown as { id: number }).id;
+		const levelChunkId = (LevelChunkPacket as unknown as { id: number }).id;
+		if (levelChunkId !== undefined) {
 			this.packetClassCache.set(
 				levelChunkId,
 				LevelChunkPacket as unknown as PacketConstructor,
@@ -68,22 +67,19 @@ export class Bridge extends Server {
 
 	private getPacketClass(
 		id: number,
-		PacketClass: (typeof Packets)[keyof typeof Packets] | undefined,
+		PacketClass?: (typeof Packets)[keyof typeof Packets],
 	): PacketConstructor | undefined {
-		const CLIENT_CACHE_STATUS_ID = 129;
-		let CachedPacketClass = this.packetClassCache.get(id);
-		if (!CachedPacketClass) {
-			if (id === CLIENT_CACHE_STATUS_ID) {
-				CachedPacketClass =
-					ClientCacheStatusPacket as unknown as PacketConstructor;
-			} else if (PacketClass && typeof PacketClass === "function") {
-				CachedPacketClass = PacketClass as unknown as PacketConstructor;
-			}
-			if (CachedPacketClass) {
-				this.packetClassCache.set(id, CachedPacketClass);
-			}
+		if (
+			!this.packetClassCache.has(id) &&
+			PacketClass &&
+			typeof PacketClass === "function"
+		) {
+			this.packetClassCache.set(
+				id,
+				PacketClass as unknown as PacketConstructor,
+			);
 		}
-		return CachedPacketClass;
+		return this.packetClassCache.get(id);
 	}
 
 	private processPacketCommon(
@@ -92,19 +88,17 @@ export class Bridge extends Server {
 		isClientbound: boolean,
 		sender: { send: (data: Buffer) => void },
 	): void {
-		const CLIENT_CACHE_STATUS_ID = 129;
 		const id = getPacketId(buffer);
 		const PacketClass = Packets[id as keyof typeof Packets];
-
-		if (!PacketClass && (id as number) !== CLIENT_CACHE_STATUS_ID) {
-			sender.send(buffer);
-			return;
-		}
-
 		const packetName = PacketClass?.name ?? "ClientCacheStatusPacket";
 		const eventName =
 			`${isClientbound ? "clientbound" : "serverbound"}-${packetName}` as keyof BridgePlayerEvents &
 				string;
+
+		if (!PacketClass && (id as number) !== 129) {
+			sender.send(buffer);
+			return;
+		}
 
 		if (packetName === "LevelChunkPacket" && !player.postStartGame) {
 			player.levelChunkQueue.push(
@@ -147,20 +141,22 @@ export class Bridge extends Server {
 					Logger.warn("Ignoring ClientCacheStatusPacket");
 					return;
 				}
-				// biome-ignore lint/style/useConst: <explanation>
-				let cancelled = false;
+
+				const cancelled = false;
 				player.emit(eventName, packet, cancelled);
 				if (cancelled) return;
+
 				if ("binary" in packet) {
 					packet.binary = [];
 				}
+
 				newBuffer = packet.serialize();
 				this.packetSerializationCache.set(cacheKey, newBuffer);
 			}
 
 			sender.send(newBuffer);
 		} catch (e) {
-			console.error(`Failed to process ${packetName}`, e);
+			Logger.error(`Failed to process ${packetName}`, e);
 			sender.send(buffer);
 		}
 	}
@@ -168,25 +164,44 @@ export class Bridge extends Server {
 	public prepare() {
 		this.on("playerConnect", this.onConnect.bind(this));
 		this.raknet.options.maxPacketsPerSecond = 20000;
+
+		this.on("disconnect", (data, _player) => {
+			const disconnect = new Protocol.DisconnectPacket();
+			disconnect.hideDisconnectScreen = true;
+			disconnect.message = new Protocol.DisconnectMessage("Disconnected");
+			disconnect.reason = Protocol.DisconnectReason.Disconnected;
+
+			const address = _player.connection.getAddress();
+			const playerKey = `${address.address}:${address.port}`;
+			const player = this.clients.get(playerKey);
+
+			if (player) {
+				const rakDisconnect = new DisconnectionNotification();
+				const frame = new Frame();
+				frame.orderChannel = 0;
+				frame.payload = rakDisconnect.serialize();
+				player.client.raknet.sendFrame(frame, Priority.Immediate);
+				player.client.send(disconnect);
+			}
+		});
 	}
 
 	public onConnect(player: Player) {
 		if (!(player.connection instanceof Connection)) return;
+
 		const bridgePlayer = new BridgePlayer(this, player);
-		this.clients.set(
-			`${player.connection.getAddress().address}:${player.connection.getAddress().port}`,
-			bridgePlayer,
-		);
+		const address = player.connection.getAddress();
+		const playerKey = `${address.address}:${address.port}`;
+
+		this.clients.set(playerKey, bridgePlayer);
 		this.emit("connect", bridgePlayer);
 
 		bridgePlayer.player.once("ClientCacheStatusPacket", (packet) => {
 			bridgePlayer.cacheStatus = packet.supported;
 		});
 
-		bridgePlayer.player.on("ClientToServerHandshakePacket", (packet) => {
-			console.log("ClientToServerHandshakePacket");
+		bridgePlayer.player.on("ClientToServerHandshakePacket", () => {
 			this.onLogin(bridgePlayer);
-			return;
 		});
 	}
 
@@ -195,10 +210,10 @@ export class Bridge extends Server {
 			host: this.options.destination.host,
 			port: this.options.destination.port,
 			version: "1.21.50",
-			offline: false,
 			tokensFolder: "tokens",
 			viewDistance: 2,
 			worker: true,
+			offline: this.options.offline,
 		});
 
 		player.client = client;
@@ -207,17 +222,18 @@ export class Bridge extends Server {
 		client.removeAllListeners("ResourcePacksInfoPacket");
 		client.removeAllListeners("PlayStatusPacket");
 
-		client.once("ResourcePacksInfoPacket", (packet) => {
+		client.once("ResourcePacksInfoPacket", () => {
 			client.send(ClientCacheStatusPacket.create(false));
 		});
 
-		player.once("serverbound-ResourcePackClientResponsePacket", (packet) => {
+		player.once("serverbound-ResourcePackClientResponsePacket", () => {
 			player.player.send(ClientCacheStatusPacket.create(false));
 		});
 
 		client.once("PlayStatusPacket", (packet) => {
-			if (packet.status !== PlayStatus.LoginSuccess)
+			if (packet.status !== PlayStatus.LoginSuccess) {
 				throw new Error("Login failed");
+			}
 
 			client.processPacket = (buffer) => {
 				this.processPacketCommon(buffer, player, true, player.player);
