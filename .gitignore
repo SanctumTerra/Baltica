@@ -179,3 +179,4 @@ tokens/
 bun.lock
 package-lock.json
 tokens/backup.ts
+src/tools/
