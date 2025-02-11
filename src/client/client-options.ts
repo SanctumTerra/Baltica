@@ -6,6 +6,7 @@ import type { AddPaintingPacket } from "../network/packets";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
+	"1.21.60" = 776
 }
 
 export enum DeviceOS {
@@ -58,7 +59,7 @@ const defaultClientOptions: ClientOptions = {
 	compressionMethod: CompressionMethod.Zlib,
 	compressionLevel: 7,
 	deviceOS: DeviceOS.NintendoSwitch,
-	version: "1.21.50",
+	version: "1.21.60",
 	username: "SanctumTerra",
 	tokensFolder: "tokens",
 	viewDistance: 10,

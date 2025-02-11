@@ -6,3 +6,4 @@ tsconfig.json
 examples
 .github/
 .github
+.npmignore
