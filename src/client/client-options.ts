@@ -6,7 +6,7 @@ import type { AddPaintingPacket } from "../network/packets";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
-	"1.21.60" = 776
+	"1.21.60" = 776,
 }
 
 export enum DeviceOS {

@@ -32,7 +32,7 @@ class PacketCompressor {
 			case CompressionMethod.Zlib:
 				return inflateRawSync(buffer);
 			case CompressionMethod.Snappy:
-				throw new Error("Snappy compression is not supported");
+				throw new Error("Snappy compression is not supported <Inflate>");
 			default:
 				return buffer;
 		}
@@ -85,7 +85,7 @@ class PacketCompressor {
 			case CompressionMethod.Zlib:
 				return deflateRawSync(buffer);
 			case CompressionMethod.Snappy:
-				throw new Error("Snappy compression is not supported");
+				throw new Error("Snappy compression is not supported <Deflate>");
 			default:
 				return buffer;
 		}
