@@ -338,14 +338,6 @@ class Client extends Emitter<ClientEvents> {
 			this.packetEncryptor.destroy();
 			this._encryptionEnabled = false;
 			Logger.cleanup()
-
-
-
-
-
-			this.packetCompressor = null as any;
-			this.raknet = null as any;
-
 		} catch (error) {
 			Logger.error("Error during disconnect:", error);
 		}

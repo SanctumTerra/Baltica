@@ -198,6 +198,12 @@ class ClientData {
 			Math.floor(Math.random() * 9000000000000000000) + 1000000000000000000;
 		return `${randomNum}`;
 	}
+
+	public static generateId() {
+		const randomNum =
+			Math.floor(Math.random() * 9000000000000000000) + 1000000000000000000;
+		return -randomNum;
+	}
 }
 
 export { ClientData };

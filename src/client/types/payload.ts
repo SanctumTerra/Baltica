@@ -67,7 +67,7 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		CapeImageHeight: skin.skinData.CapeImageHeight,
 		CapeImageWidth: skin.skinData.CapeImageWidth,
 		CapeOnClassicSkin: skin.skinData.CapeOnClassicSkin,
-		ClientRandomId: Date.now(), //ClientData.generateId(),
+		ClientRandomId: ClientData.generateId(),
 		CompatibleWithClientSideChunkGen: false,
 		CurrentInputMode: client.options.loginOptions.CurrentInputMode,
 		DefaultInputMode: client.options.loginOptions.DefaultInputMode,
