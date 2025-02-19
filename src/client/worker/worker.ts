@@ -110,6 +110,9 @@ function main() {
 				if (!client) return;
 				client.send(evt.packet);
 			}
+			if (evt.type === "disconnect") {
+				client?.disconnect();
+			}
 		} catch (error) {
 			if (!parentPort) return;
 			parentPort.postMessage({

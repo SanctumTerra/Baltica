@@ -12,7 +12,7 @@ export interface Profile {
 	uuid: string;
 	xuid: number;
 }
-const UUID_NAMESPACE = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
+export const UUID_NAMESPACE = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
 
@@ -177,6 +177,7 @@ function setupClientProfile(
 	profile: Profile,
 	accessToken: string[],
 ): void {
+	console.log(profile)
 	client.profile = profile;
 	client.data.accessToken = accessToken;
 	client.username = profile.name;

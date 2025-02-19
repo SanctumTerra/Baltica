@@ -246,6 +246,7 @@ class Client extends Emitter<ClientEvents> {
 				packet.compressionMethod,
 			);
 			this.options.compressionThreshold = packet.compressionThreshold;
+			console.log("Sending Login")
 			const loginPacket = this.data.createLoginPacket();
 			this.send(loginPacket);
 		});
@@ -328,23 +329,26 @@ class Client extends Emitter<ClientEvents> {
 	}
 
 	public disconnect() {
-		const rakDisconnect = new DisconnectionNotification();
-		const frame = new Frame();
-		frame.orderChannel = 0;
-		frame.payload = rakDisconnect.serialize();
-		this.raknet.sendFrame(frame, Priority.Immediate);
 		this.status = Status.Disconnected;
 
-		this.removeAllListeners();
-		this.raknet.cleanup();
-		if (this.raknet instanceof RaknetClient) {
-			this.raknet.removeAll();
-			this.raknet.removeAllAfter();
-			this.raknet.removeAllBefore();
-		} else {
-			this.raknet.dispose();
+		try {
+			this.removeAllListeners();
+			this.destroy();
+			this.raknet.disconnect();
+			this.packetEncryptor.destroy();
+			this._encryptionEnabled = false;
+			Logger.cleanup()
+
+
+
+
+
+			this.packetCompressor = null as any;
+			this.raknet = null as any;
+
+		} catch (error) {
+			Logger.error("Error during disconnect:", error);
 		}
-		return;
 	}
 
 	public sendMessage(text: string): void {

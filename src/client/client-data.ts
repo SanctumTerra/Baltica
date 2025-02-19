@@ -1,12 +1,12 @@
-import { type KeyExportOptions, KeyObject, createECDH } from "node:crypto";
-import { Logger } from "@sanctumterra/raknet";
 import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
-import { createSigner } from "fast-jwt";
-import type { Player } from "src/server/player";
-import { v3 as uuidv3 } from "uuid-1345";
 import type { Client } from "./client";
-import { type LoginData, prepareLoginData } from "./types/login-data";
+import { v3 as uuidv3 } from "uuid-1345";
 import { type Payload, createDefaultPayload } from "./types/payload";
+import { createSigner, type SignerOptions } from "fast-jwt";
+import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
+import { type LoginData, prepareLoginData } from "./types/login-data";
+import { Logger } from "@sanctumterra/raknet";
+import type { Player } from "../server/player";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -16,125 +16,116 @@ const pem: KeyExportOptions<"pem"> = { format: "pem", type: "sec1" };
 const der: KeyExportOptions<"der"> = { format: "der", type: "spki" };
 
 class ClientData {
-	public client: Client | Player;
-	/** This Contains a lot of Data for the Login Packet */
-	public payload: Payload;
-	/** This Contains the Access Tokens from Auth */
+    public client: Client | Player;
+    /** This Contains a lot of Data for the Login Packet */
+    public payload: Payload;
+    /** This Contains the Access Tokens from Auth */
 	public accessToken!: string[];
-	/** This Contains the Login Data */
-	public loginData: LoginData;
-	/** This Contains the Shared Secret */
-	public sharedSecret!: Buffer;
+    /** This Contains the Login Data */
+    public loginData: LoginData;
+    /** This Contains the Shared Secret */
+    public sharedSecret!: Buffer;
 
-	constructor(client: Client | Player) {
-		this.client = client;
-		this.payload = createDefaultPayload(client);
-		this.loginData = prepareLoginData();
-	}
+    constructor(client: Client | Player) {
+        this.client = client;
+        this.payload = createDefaultPayload(client);
+        this.loginData = prepareLoginData();
+    }
 
-	public createLoginPacket(): LoginPacket {
-		const loginPacket = new LoginPacket();
-		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
+    public createLoginPacket() : LoginPacket {
+        const loginPacket = new LoginPacket();
+		const chain = [
+			this.loginData.clientIdentityChain,
+			...this.accessToken,
+		];
 		const userChain = this.loginData.clientUserChain;
 		const encodedChain = JSON.stringify({ chain });
-		loginPacket.protocol = this.client.protocol;
+        loginPacket.protocol = this.client.protocol;
 		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
-		return loginPacket;
-	}
+        return loginPacket;
+    }
 
-	public async createClientChain(
-		mojangKey: string | null,
-		offline: boolean,
-	): Promise<string> {
-		return this.createClientChainInternal(mojangKey, offline);
-	}
+    public async createClientChain(
+        mojangKey: string | null,
+        offline: boolean,
+    ): Promise<string> {
+        return this.createClientChainInternal(mojangKey, offline);
+    }
 
-	private async createClientChainInternal(
-		mojangKey: string | null,
-		offline: boolean,
-	): Promise<string> {
-		const { clientX509, ecdhKeyPair } = this.loginData;
-		let payload: Record<string, unknown>;
-		let signOptions: Record<string, unknown>;
+    private async createClientChainInternal(
+        mojangKey: string | null,
+        offline: boolean,
+    ): Promise<string> {
+        const { clientX509, ecdhKeyPair } = this.loginData;
+        let payload: Record<string, unknown>;
+        let signOptions: SignerOptions;
+    
+        if (offline) {
+            payload = {
+                nbf: Math.floor(Date.now() / 1000),
+                randomNonce: Math.floor(Math.random() * 100000),
+                iat: Math.floor(Date.now() / 1000),
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                extraData: {
+                    displayName: this.client.profile.name,
+                    identity: this.client.profile.uuid,
+                    titleId: "89692877",
+                    XUID: "",
+                },
+                certificateAuthority: true,
+                identityPublicKey: clientX509,
+            };
+            signOptions = {
+                algorithm: algorithm,
+                header: { 
+                    alg: algorithm, 
+                    x5u: clientX509,
+                    typ: "JWT"
+                },
+            };
+        } else {
+            payload = {
+                identityPublicKey: mojangKey || PUBLIC_KEY,
+                certificateAuthority: true,
+            };
+            signOptions = {
+                algorithm: algorithm,
+                header: { alg: algorithm, x5u: clientX509 },
+            };
+        }
+    
+        const signer = createSigner({
+            ...signOptions,
+            key: ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+        });
+        
+        return signer(payload);
+    }
 
-		if (offline) {
-			payload = {
-				extraData: {
-					displayName: this.client.profile.name,
-					identity: this.client.profile.uuid,
-					titleId: "89692877",
-					XUID: "0",
-				},
-				certificateAuthority: true,
-				identityPublicKey: clientX509,
-			};
-			signOptions = {
-				algorithm: algorithm,
-				notBefore: 0,
-				issuer: "self",
-				expiresIn: 60 * 60,
-				header: { alg: algorithm, x5u: clientX509, typ: undefined },
-			};
-		} else {
-			payload = {
-				identityPublicKey: mojangKey || PUBLIC_KEY,
-				certificateAuthority: true,
-			};
-			signOptions = {
-				algorithm: algorithm,
-				header: { alg: algorithm, x5u: clientX509, typ: undefined },
-			};
-		}
+    public async createClientUserChain(privateKey: KeyObject): Promise<string> {
+        const { clientX509 } = this.loginData;
+        const customPayload = this.client.options.skinData || {};
+    
+        const payload: Payload = {
+            ...this.payload,
+            ...customPayload,
+            ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
+            ClientRandomId: Date.now(),
+            DeviceId: ClientData.nextUUID(this.client.profile?.name),
+            PlayFabId: ClientData.nextUUID(this.client.profile?.name).replace(/-/g, "").slice(0, 16),
+            SelfSignedId: ClientData.nextUUID(this.client.profile?.name),
+        };
+    
+        const signer = createSigner({
+            algorithm,
+            header: { alg: algorithm, x5u: clientX509 },
+            key: privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+        });
 
-		const privateKeyPem = ecdhKeyPair.privateKey.export({
-			format: "pem",
-			type: "pkcs8",
-		}) as string;
-		const signer = createSigner({
-			...signOptions,
-			key: privateKeyPem,
-		});
+        return signer(payload);
+    }
 
-		return signer(payload);
-	}
-
-	public async createClientUserChain(privateKey: KeyObject): Promise<string> {
-		const { clientX509 } = this.loginData;
-		const customPayload = this.client.options.skinData || {};
-
-		const payload: Payload = {
-			...this.payload,
-			...customPayload,
-			ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
-			ClientRandomId: Date.now(),
-			DeviceId: ClientData.nextUUID(),
-			PlayFabId: ClientData.nextUUID().replace(/-/g, "").slice(0, 16),
-			SelfSignedId: ClientData.nextUUID(),
-		};
-		if (privateKey.asymmetricKeyDetails?.namedCurve === "p384")
-			privateKey.asymmetricKeyDetails.namedCurve = "secp384r1";
-
-		// Deno sucks.
-		// Logger.info('Private Key details:', {
-		// 	type: privateKey.type,
-		// 	curve: privateKey.asymmetricKeyDetails?.namedCurve
-		// });
-
-		const privateKeyPem = privateKey.export({
-			format: "pem",
-			type: "pkcs8",
-		}) as string;
-		const signer = createSigner({
-			algorithm,
-			header: { alg: algorithm, x5u: clientX509, typ: undefined },
-			noTimestamp: true,
-			key: privateKeyPem,
-		});
-
-		return signer(payload);
-	}
-
-	public createSharedSecret(
+    public createSharedSecret(
 		privateKey: KeyObject,
 		publicKey: KeyObject,
 	): Buffer {
@@ -146,9 +137,7 @@ class ClientData {
 		}
 
 		try {
-			const normalizedCurve = curve === "p384" ? "secp384r1" : curve;
-
-			const ecdh = createECDH(normalizedCurve);
+			const ecdh = createECDH(curve);
 			const privateKeyJwk = privateKey.export({ format: "jwk" }) as {
 				d?: string;
 			};
@@ -182,7 +171,7 @@ class ClientData {
 		}
 	}
 
-	private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
+    private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
 		if (
 			!(privateKey instanceof KeyObject) ||
 			!(publicKey instanceof KeyObject)
@@ -197,18 +186,13 @@ class ClientData {
 		}
 	}
 
-	public static nextUUID() {
+    public static nextUUID(username: string) {
 		return uuidv3({
 			namespace: "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
-			name: Date.now().toString(),
+			name: username,
 		});
 	}
 
-	public static generateId() {
-		const randomNum =
-			Math.floor(Math.random() * 9000000000000000000) + 1000000000000000000;
-		return -randomNum;
-	}
 	public static OnlineId() {
 		const randomNum =
 			Math.floor(Math.random() * 9000000000000000000) + 1000000000000000000;

@@ -98,6 +98,11 @@ class WorkerClient extends Emitter<ClientEvents> {
 		this.removeAllListeners();
 	}
 
+	public disconnect() {
+		if (!this._worker) return;
+		this._worker.postMessage({ type: "disconnect" });
+	}
+
 	public cleanup() {
 		this.removeAllListeners();
 		this._worker?.postMessage({ type: "cleanup" });

@@ -106,6 +106,11 @@ class Emitter<T> {
 			this.once_callbacks.some((cb) => cb.name === name)
 		);
 	}
+
+	public destroy() {
+		this.on_callbacks = [];
+		this.once_callbacks = [];
+	}
 }
 
 export { Emitter };

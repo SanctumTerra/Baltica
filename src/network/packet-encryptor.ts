@@ -28,6 +28,11 @@ class PacketEncryptor {
 		this.initializeDecipher(client.iv);
 	}
 
+	destroy() {
+		this.cipher = null;
+		this.decipher = null;
+	}
+
 	initializeCipher(iv: Buffer) {
 		if (this.cipher) return;
 		this.cipher = crypto.createCipheriv(
