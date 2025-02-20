@@ -9,8 +9,8 @@ import {
 import * as Protocol from "@serenityjs/protocol";
 import { Client, type PacketNames } from "../client";
 import type { ForceArray } from "../libs";
-import { ClientCacheStatusPacket } from "../network/client-cache-status";
-import { LevelChunkPacket } from "../network/level-chunk-packet";
+import { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
+import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import { type Player, Server, type ServerEvents } from "../server";
 import {
 	type BridgeOptions,
@@ -209,13 +209,14 @@ export class Bridge extends Server {
 		const client = new Client({
 			host: this.options.destination.host,
 			port: this.options.destination.port,
-			version: "1.21.50",
+			version: this.options.version,
 			tokensFolder: "tokens",
 			viewDistance: 2,
 			worker: true,
 			offline: this.options.offline,
 		});
-
+		console.log(this.options);
+		
 		player.client = client;
 		client.cancelPastLogin = true;
 		client.removeAllListeners("ResourcePackStackPacket");
@@ -232,6 +233,7 @@ export class Bridge extends Server {
 
 		client.once("PlayStatusPacket", (packet) => {
 			if (packet.status !== PlayStatus.LoginSuccess) {
+				console.log(packet)
 				throw new Error("Login failed");
 			}
 
