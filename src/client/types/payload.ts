@@ -38,7 +38,7 @@ export type Payload = {
 	PlatformOnlineId: string;
 	PlatformType: number;
 	PlayFabId: string;
-	PlatformUserId: string;
+	// PlatformUserId: string;
 	PremiumSkin: boolean;
 	SelfSignedId: string;
 	ServerAddress: string;
@@ -60,7 +60,7 @@ export type Payload = {
 export const createDefaultPayload = (client: Client | Player): Payload => {
 	const username = client.profile?.name ?? client.options.username;
 	const payload = {
-		AnimatedImageData: skin.skinData.AnimatedImageData as AnimatedImageData[] ?? [],
+		AnimatedImageData: skin.skinData.AnimatedImageData as AnimatedImageData[],
 		ArmSize: skin.skinData.ArmSize,
 		CapeData: skin.skinData.CapeData,
 		CapeId: skin.skinData.CapeId,
@@ -87,7 +87,7 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		PlatformOfflineId: ClientData.nextUUID(username).replace(/-/g, ""),
 		PlatformOnlineId: ClientData.OnlineId(),
 		PlatformType: 2,
-		PlatformUserId: "",
+		// PlatformUserId: "",
 		PlayFabId: ClientData.nextUUID(username).replace(/-/g, "").slice(0, 16),
 		PremiumSkin: skin.skinData.PremiumSkin,
 		SelfSignedId: ClientData.nextUUID(username),

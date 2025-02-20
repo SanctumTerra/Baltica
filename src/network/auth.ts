@@ -1,7 +1,7 @@
 import { createPublicKey } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
 import type { LoginTokens } from "@serenityjs/protocol";
-import { createVerifier } from "fast-jwt";
+import * as jose from "jose";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
@@ -177,7 +177,6 @@ function setupClientProfile(
 	profile: Profile,
 	accessToken: string[],
 ): void {
-	console.log(profile)
 	client.profile = profile;
 	client.data.accessToken = accessToken;
 	client.username = profile.name;
@@ -211,55 +210,66 @@ const getDER = (b64: string) => {
 		format: "der",
 		type: "spki",
 	});
-	return key.export({ format: "pem", type: "spki" });
+	return key.export({ format: "pem", type: "spki" }) as string;
 };
 
-const readAuth = (chain: string[]) => {
+const readAuth = async (chain: string[]) => {
 	let authData = {};
 	let pubKey = getDER(getX5U(chain[0]));
-	let key = null;
+	let key: string | null = null;
 	let verified = false;
 
 	for (const token of chain) {
-		const verifier = createVerifier({
-			key: pubKey,
+		const publicKey = await jose.importSPKI(pubKey, "ES384");
+		const { payload } = await jose.jwtVerify(token, publicKey, {
 			algorithms: ["ES384"],
 		});
-		const decoded = verifier(token);
 		const x5u = getX5U(token);
 
 		if (x5u === PUBLIC_KEY) {
 			verified = true;
 		}
 
-		pubKey = decoded.identityPublicKey
-			? getDER(decoded.identityPublicKey)
-			: x5u;
-		key = decoded.identityPublicKey || key;
-		authData = { ...authData, ...decoded };
+		const identityPublicKey =
+			typeof payload.identityPublicKey === "string"
+				? payload.identityPublicKey
+				: null;
+
+		if (identityPublicKey) {
+			pubKey = getDER(identityPublicKey);
+			key = identityPublicKey;
+		} else {
+			pubKey = getDER(x5u);
+			key = x5u;
+		}
+
+		authData = { ...authData, ...payload };
+	}
+
+	if (!key) {
+		throw new Error("No identity public key found in chain");
 	}
 
 	return { key, data: authData };
 };
 
-const readSkin = (publicKey: string, token: string) => {
+const readSkin = async (publicKey: string, token: string) => {
 	const pubKey = getDER(publicKey);
-	const verifier = createVerifier({
-		key: pubKey,
+	const key = await jose.importSPKI(pubKey, "ES384");
+	const { payload } = await jose.jwtVerify(token, key, {
 		algorithms: ["ES384"],
 	});
-	const decoded = verifier(token);
-	return decoded;
+	return payload;
 };
 
-const decodeLoginJWT = (tokens: LoginTokens) => {
+const decodeLoginJWT = async (tokens: LoginTokens) => {
 	const identity = tokens.identity;
 	const client = tokens.client;
 	const payload = JSON.parse(identity);
 	const ClientUserChain = payload.chain;
 
-	const auth = readAuth(ClientUserChain);
-	const skin = readSkin(auth.key, tokens.client);
+	const auth = await readAuth(ClientUserChain);
+	const skin = await readSkin(auth.key, tokens.client);
 	return { key: auth.key, data: auth.data, skin };
 };
 

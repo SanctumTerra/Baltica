@@ -2,7 +2,7 @@ import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import type { Client } from "./client";
 import { v3 as uuidv3 } from "uuid-1345";
 import { type Payload, createDefaultPayload } from "./types/payload";
-import { createSigner, type SignerOptions } from "fast-jwt";
+import * as jose from "jose";
 import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
 import { type LoginData, prepareLoginData } from "./types/login-data";
 import { Logger } from "@sanctumterra/raknet";
@@ -16,116 +16,114 @@ const pem: KeyExportOptions<"pem"> = { format: "pem", type: "sec1" };
 const der: KeyExportOptions<"der"> = { format: "der", type: "spki" };
 
 class ClientData {
-    public client: Client | Player;
-    /** This Contains a lot of Data for the Login Packet */
-    public payload: Payload;
-    /** This Contains the Access Tokens from Auth */
+	public client: Client | Player;
+	/** This Contains a lot of Data for the Login Packet */
+	public payload: Payload;
+	/** This Contains the Access Tokens from Auth */
 	public accessToken!: string[];
-    /** This Contains the Login Data */
-    public loginData: LoginData;
-    /** This Contains the Shared Secret */
-    public sharedSecret!: Buffer;
+	/** This Contains the Login Data */
+	public loginData: LoginData;
+	/** This Contains the Shared Secret */
+	public sharedSecret!: Buffer;
 
-    constructor(client: Client | Player) {
-        this.client = client;
-        this.payload = createDefaultPayload(client);
-        this.loginData = prepareLoginData();
-    }
+	constructor(client: Client | Player) {
+		this.client = client;
+		this.payload = createDefaultPayload(client);
+		this.loginData = prepareLoginData();
+	}
 
-    public createLoginPacket() : LoginPacket {
-        const loginPacket = new LoginPacket();
-		const chain = [
-			this.loginData.clientIdentityChain,
-			...this.accessToken,
-		];
+	public createLoginPacket(): LoginPacket {
+		const loginPacket = new LoginPacket();
+		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
 		const userChain = this.loginData.clientUserChain;
 		const encodedChain = JSON.stringify({ chain });
-        loginPacket.protocol = this.client.protocol;
+		loginPacket.protocol = this.client.protocol;
 		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
-        return loginPacket;
-    }
+		return loginPacket;
+	}
 
-    public async createClientChain(
-        mojangKey: string | null,
-        offline: boolean,
-    ): Promise<string> {
-        return this.createClientChainInternal(mojangKey, offline);
-    }
+	public async createClientChain(
+		mojangKey: string | null,
+		offline: boolean,
+	): Promise<string> {
+		return this.createClientChainInternal(mojangKey, offline);
+	}
 
-    private async createClientChainInternal(
-        mojangKey: string | null,
-        offline: boolean,
-    ): Promise<string> {
-        const { clientX509, ecdhKeyPair } = this.loginData;
-        let payload: Record<string, unknown>;
-        let signOptions: SignerOptions;
-    
-        if (offline) {
-            payload = {
-                nbf: Math.floor(Date.now() / 1000),
-                randomNonce: Math.floor(Math.random() * 100000),
-                iat: Math.floor(Date.now() / 1000),
-                exp: Math.floor(Date.now() / 1000) + 3600,
-                extraData: {
-                    displayName: this.client.profile.name,
-                    identity: this.client.profile.uuid,
-                    titleId: "89692877",
-                    XUID: "",
-                },
-                certificateAuthority: true,
-                identityPublicKey: clientX509,
-            };
-            signOptions = {
-                algorithm: algorithm,
-                header: { 
-                    alg: algorithm, 
-                    x5u: clientX509,
-                    typ: "JWT"
-                },
-            };
-        } else {
-            payload = {
-                identityPublicKey: mojangKey || PUBLIC_KEY,
-                certificateAuthority: true,
-            };
-            signOptions = {
-                algorithm: algorithm,
-                header: { alg: algorithm, x5u: clientX509 },
-            };
-        }
-    
-        const signer = createSigner({
-            ...signOptions,
-            key: ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-        });
-        
-        return signer(payload);
-    }
+	private async createClientChainInternal(
+		mojangKey: string | null,
+		offline: boolean,
+	): Promise<string> {
+		const { clientX509, ecdhKeyPair } = this.loginData;
+		let payload: Record<string, unknown>;
+		let header: jose.JWTHeaderParameters;
 
-    public async createClientUserChain(privateKey: KeyObject): Promise<string> {
-        const { clientX509 } = this.loginData;
-        const customPayload = this.client.options.skinData || {};
-    
-        const payload: Payload = {
-            ...this.payload,
-            ...customPayload,
-            ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
-            ClientRandomId: Date.now(),
-            DeviceId: ClientData.nextUUID(this.client.profile?.name),
-            PlayFabId: ClientData.nextUUID(this.client.profile?.name).replace(/-/g, "").slice(0, 16),
-            SelfSignedId: ClientData.nextUUID(this.client.profile?.name),
-        };
-    
-        const signer = createSigner({
-            algorithm,
-            header: { alg: algorithm, x5u: clientX509 },
-            key: privateKey.export({ format: "pem", type: "pkcs8" }) as string,
-        });
+		if (offline) {
+			payload = {
+				nbf: Math.floor(Date.now() / 1000),
+				randomNonce: Math.floor(Math.random() * 100000),
+				iat: Math.floor(Date.now() / 1000),
+				exp: Math.floor(Date.now() / 1000) + 3600,
+				extraData: {
+					displayName: this.client.profile.name,
+					identity: this.client.profile.uuid,
+					titleId: "89692877",
+					XUID: "",
+				},
+				certificateAuthority: true,
+				identityPublicKey: clientX509,
+			};
+			header = {
+				alg: algorithm as "ES384",
+				x5u: clientX509,
+			};
+		} else {
+			payload = {
+				identityPublicKey: mojangKey || PUBLIC_KEY,
+				certificateAuthority: true,
+			};
+			header = {
+				alg: algorithm as "ES384",
+				x5u: clientX509,
+			};
+		}
 
-        return signer(payload);
-    }
+		const privateKey = await jose.importPKCS8(
+			ecdhKeyPair.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+			algorithm,
+		);
 
-    public createSharedSecret(
+		return new jose.SignJWT(payload)
+			.setProtectedHeader(header)
+			.sign(privateKey);
+	}
+
+	public async createClientUserChain(privateKey: KeyObject): Promise<string> {
+		const { clientX509 } = this.loginData;
+		const customPayload = this.client.options.skinData || {};
+
+		const payload: Payload = {
+			...this.payload,
+			...customPayload,
+			ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
+			ClientRandomId: Date.now(),
+			DeviceId: ClientData.nextUUID(this.client.profile?.name),
+			PlayFabId: ClientData.nextUUID(this.client.profile?.name)
+				.replace(/-/g, "")
+				.slice(0, 16),
+			SelfSignedId: ClientData.nextUUID(this.client.profile?.name),
+		};
+
+		const josePrivateKey = await jose.importPKCS8(
+			privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+			algorithm,
+		);
+
+		return new jose.SignJWT(payload)
+			.setProtectedHeader({ alg: algorithm as "ES384", x5u: clientX509 })
+			.sign(josePrivateKey);
+	}
+
+	public createSharedSecret(
 		privateKey: KeyObject,
 		publicKey: KeyObject,
 	): Buffer {
@@ -171,7 +169,7 @@ class ClientData {
 		}
 	}
 
-    private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
+	private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
 		if (
 			!(privateKey instanceof KeyObject) ||
 			!(publicKey instanceof KeyObject)
@@ -186,7 +184,7 @@ class ClientData {
 		}
 	}
 
-    public static nextUUID(username: string) {
+	public static nextUUID(username: string) {
 		return uuidv3({
 			namespace: "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
 			name: username,

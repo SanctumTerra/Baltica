@@ -1,8 +1,18 @@
-import { CompressionMethod, InputMode } from "@serenityjs/protocol";
+import { CompressionMethod, DataPacket, InputMode } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
-import type { ClientCacheStatusPacket } from "../network/client-cache-status";
+import type { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import type { Advertisement } from "@sanctumterra/raknet";
-import type { AddPaintingPacket } from "../network/packets";
+import {
+	AddPaintingPacket,
+	UpdateSubchunkBlocksPacket,
+	MotionPredictHintsPacket,
+	SetLastHurtByPacket,
+	SetDefaultGamemodePacket,
+	UpdatePlayerGameTypePacket,
+	UpdateBlockSyncPacket,
+} from "../network/packets";
+import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
+
 
 export enum ProtocolList {
 	"1.21.50" = 766,
@@ -74,6 +84,9 @@ const defaultClientOptions: ClientOptions = {
 	betaAuth: false,
 };
 
+
+// : Record<number, typeof DataPacket>
+
 type PacketNames = {
 	[K in keyof typeof Protocol]: K extends `${string}Packet`
 		? K extends "Packet" | "DataPacket"
@@ -86,8 +99,13 @@ type ClientEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];
 } & {
 	session: [];
-	ClientCacheStatus: [packet: ClientCacheStatusPacket];
-	AddPaintingPacket: [packet: AddPaintingPacket];
+	ClientCacheStatusPacket: [packet: InstanceType<typeof ClientCacheStatusPacket>];
+	UpdateSubchunkBlocksPacket: [packet: InstanceType<typeof UpdateSubchunkBlocksPacket>];
+	MotionPredictHintsPacket: [packet: InstanceType<typeof MotionPredictHintsPacket>];
+	SetLastHurtByPacket: [packet: InstanceType<typeof SetLastHurtByPacket>];	
+	SetDefaultGamemodePacket: [packet: InstanceType<typeof SetDefaultGamemodePacket>];
+	UpdatePlayerGameTypePacket: [packet: InstanceType<typeof UpdatePlayerGameTypePacket>];
+	UpdateBlockSyncPacket: [packet: InstanceType<typeof UpdateBlockSyncPacket>];
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
 	connect: [packet: Advertisement];
@@ -98,4 +116,15 @@ export {
 	defaultClientOptions,
 	type ClientEvents,
 	type PacketNames,
+};
+
+export const ExtraPackets = {
+	[58]: LevelChunkPacket,
+	[22]: AddPaintingPacket,
+	[172]: UpdateSubchunkBlocksPacket,
+	[157]: MotionPredictHintsPacket,
+	[96]: SetLastHurtByPacket,
+	[105]: SetDefaultGamemodePacket,
+	[151]: UpdatePlayerGameTypePacket,
+	[110]: UpdateBlockSyncPacket,
 };
