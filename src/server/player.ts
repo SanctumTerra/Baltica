@@ -31,11 +31,11 @@ import { ClientData } from "../client/client-data";
 import type { Payload } from "../client/types";
 import { Emitter } from "../libs";
 import { PacketCompressor, type Profile, decodeLoginJWT } from "../network";
-import { ClientCacheStatusPacket } from "../network/client-cache-status";
+import { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import { PacketEncryptor } from "../network/packet-encryptor";
 import type { Server } from "./server";
 import type { PlayerEvents } from "./server-options";
-import { createSigner } from "fast-jwt";
+import * as jose from "jose";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);
@@ -118,8 +118,8 @@ class Player extends Emitter<PlayerEvents> {
 				this.server.options.compressionThreshold;
 		});
 
-		this.once("LoginPacket", (packet) => {
-			const { key, data, skin } = decodeLoginJWT(packet.tokens);
+		this.once("LoginPacket", async (packet) => {
+			const { key, data, skin } = await decodeLoginJWT(packet.tokens);
 			const extraData = (data as { extraData: object }).extraData as {
 				displayName: string;
 				identity: string;
@@ -153,21 +153,23 @@ class Player extends Emitter<PlayerEvents> {
 			this.secretKeyBytes = secretHash.digest();
 			this.iv = this.secretKeyBytes.slice(0, 16);
 
-			const privateKeyPem = this.data.loginData.ecdhKeyPair.privateKey.export({
-				format: "pem",
-				type: "pkcs8",
-			}) as string;
+			const privateKey = await jose.importPKCS8(
+				this.data.loginData.ecdhKeyPair.privateKey.export({
+					format: "pem",
+					type: "pkcs8",
+				}) as string,
+				"ES384",
+			);
 
-			const signer = createSigner({
-				algorithm: "ES384",
-				header: { alg: "ES384", x5u: this.data.loginData.clientX509 },
-				key: privateKeyPem,
-			});
-
-			const token = signer({
+			const token = await new jose.SignJWT({
 				salt: SALT_BUFFER.toString("base64"),
 				signedToken: this.data.loginData.clientX509,
-			});
+			})
+				.setProtectedHeader({
+					alg: "ES384",
+					x5u: this.data.loginData.clientX509,
+				})
+				.sign(privateKey);
 
 			const handshake = new ServerToClientHandshakePacket();
 			handshake.token = token;

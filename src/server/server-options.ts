@@ -1,7 +1,7 @@
 import { CompressionMethod, type DataPacket } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
 import type { PacketNames } from "../client";
-import type { ClientCacheStatusPacket } from "../network/client-cache-status";
+import type { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 
 type Version = "1.21.50" | "1.21.60";
 
