@@ -4,5 +4,5 @@ import { ZigZag } from "@serenityjs/binarystream";
 
 @Create(105)
 export class SetDefaultGamemodePacket extends DataPacket {
-    @Serialize(ZigZag) public gamemode!: number;
-} 
+	@Serialize(ZigZag) public gamemode!: number;
+}

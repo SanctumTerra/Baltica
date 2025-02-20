@@ -13,7 +13,6 @@ import {
 } from "../network/packets";
 import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 
-
 export enum ProtocolList {
 	"1.21.50" = 766,
 	"1.21.60" = 776,
@@ -84,7 +83,6 @@ const defaultClientOptions: ClientOptions = {
 	betaAuth: false,
 };
 
-
 // : Record<number, typeof DataPacket>
 
 type PacketNames = {
@@ -99,12 +97,22 @@ type ClientEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];
 } & {
 	session: [];
-	ClientCacheStatusPacket: [packet: InstanceType<typeof ClientCacheStatusPacket>];
-	UpdateSubchunkBlocksPacket: [packet: InstanceType<typeof UpdateSubchunkBlocksPacket>];
-	MotionPredictHintsPacket: [packet: InstanceType<typeof MotionPredictHintsPacket>];
-	SetLastHurtByPacket: [packet: InstanceType<typeof SetLastHurtByPacket>];	
-	SetDefaultGamemodePacket: [packet: InstanceType<typeof SetDefaultGamemodePacket>];
-	UpdatePlayerGameTypePacket: [packet: InstanceType<typeof UpdatePlayerGameTypePacket>];
+	ClientCacheStatusPacket: [
+		packet: InstanceType<typeof ClientCacheStatusPacket>,
+	];
+	UpdateSubchunkBlocksPacket: [
+		packet: InstanceType<typeof UpdateSubchunkBlocksPacket>,
+	];
+	MotionPredictHintsPacket: [
+		packet: InstanceType<typeof MotionPredictHintsPacket>,
+	];
+	SetLastHurtByPacket: [packet: InstanceType<typeof SetLastHurtByPacket>];
+	SetDefaultGamemodePacket: [
+		packet: InstanceType<typeof SetDefaultGamemodePacket>,
+	];
+	UpdatePlayerGameTypePacket: [
+		packet: InstanceType<typeof UpdatePlayerGameTypePacket>,
+	];
 	UpdateBlockSyncPacket: [packet: InstanceType<typeof UpdateBlockSyncPacket>];
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];

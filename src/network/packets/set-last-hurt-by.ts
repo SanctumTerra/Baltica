@@ -4,5 +4,5 @@ import { VarInt } from "@serenityjs/binarystream";
 
 @Create(96)
 export class SetLastHurtByPacket extends DataPacket {
-    @Serialize(VarInt) public lastHurtBy!: bigint;
+	@Serialize(VarInt) public lastHurtBy!: bigint;
 }

@@ -216,7 +216,7 @@ export class Bridge extends Server {
 			offline: this.options.offline,
 		});
 		console.log(this.options);
-		
+
 		player.client = client;
 		client.cancelPastLogin = true;
 		client.removeAllListeners("ResourcePackStackPacket");
@@ -233,7 +233,7 @@ export class Bridge extends Server {
 
 		client.once("PlayStatusPacket", (packet) => {
 			if (packet.status !== PlayStatus.LoginSuccess) {
-				console.log(packet)
+				console.log(packet);
 				throw new Error("Login failed");
 			}
 
