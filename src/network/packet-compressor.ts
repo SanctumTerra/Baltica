@@ -32,6 +32,7 @@ class PacketCompressor {
 			case CompressionMethod.Zlib:
 				return inflateRawSync(buffer);
 			case CompressionMethod.Snappy:
+   // I tried but BDS keeps crashing cause of it.
 				throw new Error("Snappy compression is not supported <Inflate>");
 			default:
 				return buffer;
