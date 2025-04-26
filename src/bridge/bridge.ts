@@ -1,5 +1,6 @@
 import { Connection, Frame, Logger, Priority } from "@sanctumterra/raknet";
 import {
+	ClientCacheStatusPacket,
 	type DataPacket,
 	type Packet,
 	Packets,
@@ -9,7 +10,6 @@ import {
 import * as Protocol from "@serenityjs/protocol";
 import { Client, type PacketNames } from "../client";
 import type { ForceArray } from "../libs";
-import { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import { type Player, Server, type ServerEvents } from "../server";
 import {
@@ -137,7 +137,7 @@ export class Bridge extends Server {
 				).deserialize() as ProtocolPacket;
 
 				if (packet instanceof ClientCacheStatusPacket) {
-					packet.supported = false;
+					packet.enabled = false;
 					Logger.warn("Ignoring ClientCacheStatusPacket");
 					return;
 				}
@@ -196,8 +196,8 @@ export class Bridge extends Server {
 		this.clients.set(playerKey, bridgePlayer);
 		this.emit("connect", bridgePlayer);
 
-		bridgePlayer.player.once("ClientCacheStatusPacket", (packet) => {
-			bridgePlayer.cacheStatus = packet.supported;
+		bridgePlayer.player.once("ClientCacheStatusPacket", (packet: ClientCacheStatusPacket) => {
+			bridgePlayer.cacheStatus = packet.enabled;
 		});
 
 		bridgePlayer.player.on("ClientToServerHandshakePacket", () => {
@@ -224,11 +224,15 @@ export class Bridge extends Server {
 		client.removeAllListeners("PlayStatusPacket");
 
 		client.once("ResourcePacksInfoPacket", () => {
-			client.send(ClientCacheStatusPacket.create(false));
+			const packet = new ClientCacheStatusPacket();
+			packet.enabled = false;
+			client.send(packet.serialize());
 		});
 
 		player.once("serverbound-ResourcePackClientResponsePacket", () => {
-			player.player.send(ClientCacheStatusPacket.create(false));
+			const packet = new ClientCacheStatusPacket();
+			packet.enabled = false;
+			player.player.send(packet.serialize());
 		});
 
 		client.once("PlayStatusPacket", (packet) => {

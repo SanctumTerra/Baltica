@@ -7,6 +7,7 @@ import {
 	Status,
 } from "@sanctumterra/raknet";
 import {
+	ClientCacheStatusPacket,
 	CompressionMethod,
 	DataPacket,
 	DisconnectMessage,
@@ -31,7 +32,6 @@ import { ClientData } from "../client/client-data";
 import type { Payload } from "../client/types";
 import { Emitter } from "../libs";
 import { PacketCompressor, type Profile, decodeLoginJWT } from "../network";
-import { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import { PacketEncryptor } from "../network/packet-encryptor";
 import type { Server } from "./server";
 import type { PlayerEvents } from "./server-options";

@@ -4,23 +4,23 @@ import { Proto, Serialize } from "@serenityjs/raknet";
 
 @Proto(129)
 class ClientCacheStatusPacket extends DataPacket {
-	public supported = false;
+	public enabled = false;
 
 	public override deserialize(): this {
 		this.readVarInt();
-		this.supported = this.readBool();
+		this.enabled = this.readBool();
 		return this;
 	}
 
 	public override serialize(): Buffer {
 		this.writeVarInt(129);
-		this.writeBool(this.supported);
+		this.writeBool(this.enabled);
 		return this.getBuffer();
 	}
 
 	static create(enabled: boolean): ClientCacheStatusPacket {
 		const packet = new ClientCacheStatusPacket();
-		packet.supported = enabled;
+		packet.enabled = enabled;
 		return packet;
 	}
 }
