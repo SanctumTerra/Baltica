@@ -16,6 +16,7 @@ import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 export enum ProtocolList {
 	"1.21.50" = 766,
 	"1.21.60" = 776,
+	"1.21.70" = 786,
 }
 
 export enum DeviceOS {
@@ -68,7 +69,7 @@ const defaultClientOptions: ClientOptions = {
 	compressionMethod: CompressionMethod.Zlib,
 	compressionLevel: 7,
 	deviceOS: DeviceOS.NintendoSwitch,
-	version: "1.21.60",
+	version: "1.21.70",
 	username: "SanctumTerra",
 	tokensFolder: "tokens",
 	viewDistance: 10,

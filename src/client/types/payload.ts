@@ -55,6 +55,7 @@ export type Payload = {
 	ThirdPartyNameOnly: boolean;
 	TrustedSkin: boolean;
 	UIProfile: number;
+	GraphicsMode: number;
 };
 
 export const createDefaultPayload = (client: Client | Player): Payload => {
@@ -105,6 +106,7 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		ThirdPartyNameOnly: false,
 		TrustedSkin: skin.skinData.TrustedSkin,
 		UIProfile: 0,
+		GraphicsMode: 0,
 	};
 	return payload;
 };
