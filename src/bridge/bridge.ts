@@ -196,9 +196,12 @@ export class Bridge extends Server {
 		this.clients.set(playerKey, bridgePlayer);
 		this.emit("connect", bridgePlayer);
 
-		bridgePlayer.player.once("ClientCacheStatusPacket", (packet: ClientCacheStatusPacket) => {
-			bridgePlayer.cacheStatus = packet.enabled;
-		});
+		bridgePlayer.player.once(
+			"ClientCacheStatusPacket",
+			(packet: ClientCacheStatusPacket) => {
+				bridgePlayer.cacheStatus = packet.enabled;
+			},
+		);
 
 		bridgePlayer.player.on("ClientToServerHandshakePacket", () => {
 			this.onLogin(bridgePlayer);
