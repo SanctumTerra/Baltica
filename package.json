@@ -23,7 +23,9 @@
 	],
 	"dependencies": {
 		"@sanctumterra/raknet": "^1.3.77",
-		"@serenityjs/protocol": "^0.7.0",
+		"@serenityjs/binarystream": "^2.7.0",
+		"@serenityjs/core": "^0.8.2",
+		"@serenityjs/protocol": "0.8.2",
 		"axios": "^1.7.9",
 		"elliptic": "^6.6.1",
 		"jose": "^5.2.3",
