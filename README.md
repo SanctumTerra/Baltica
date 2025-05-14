@@ -4,6 +4,10 @@
   <img src="https://raw.githubusercontent.com/SanctumTerra/Baltica/master/.extra/logo.png" alt="Baltica Logo" width="200"/>
 </p>
 
+---
+**Supported Versions**   `1.21.80` `1.21.70` `1.21.60` `1.21.50`
+---
+
 Baltica is a high-performance Minecraft Bedrock Edition networking toolkit built with TypeScript. It serves three main purposes:
 1. A powerful bridge/proxy that can modify, intercept, and manipulate network traffic between Minecraft Bedrock clients and servers
 2. A robust client library for creating Minecraft Bedrock bots and automated players
