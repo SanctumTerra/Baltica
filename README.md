@@ -289,11 +289,6 @@ Baltica supports both Node.js and Bun runtimes, with Bun offering significant pe
 - Better packet processing performance
 - Improved concurrent connections handling
 
-To run with Bun:
-```bash
-bun run start
-```
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
