@@ -101,7 +101,7 @@ class ClientData {
 		const { clientX509 } = this.loginData;
 		// Partial Payload
 		const customPayload = {
-			...this.client.options.skinData
+			...this.client.options.skinData,
 		};
 
 		const payload: Payload = {

@@ -66,9 +66,12 @@ export class Server extends Emitter<ServerEvents> {
 				try {
 					existingPlayer.send(disconnectPacket); // Assuming Player class has a send method for Protocol packets
 					// Optionally, also force close RakNet connection if send isn't enough or player is unresponsive
-					existingPlayer.connection.disconnect(); 
+					existingPlayer.connection.disconnect();
 				} catch (error) {
-					Logger.error(`Error sending disconnect to existing player ${connectionKey}:`, error);
+					Logger.error(
+						`Error sending disconnect to existing player ${connectionKey}:`,
+						error,
+					);
 				}
 				this.onDisconnect(existingPlayer); // Ensure cleanup and event emission
 			}

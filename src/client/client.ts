@@ -109,11 +109,11 @@ class Client extends Emitter<ClientEvents> {
 
 	public async connect(): Promise<[Advertisement, StartGamePacket]> {
 		await this.waitForSessionReady();
-		
+
 		this.status = Status.Connecting;
 		this.packetCompressor = new PacketCompressor(this);
 		this.setupEventListeners();
-		
+
 		const advertisement = await this.raknet.connect();
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
 
@@ -126,13 +126,15 @@ class Client extends Emitter<ClientEvents> {
 		}
 	}
 
-	private async waitForConnection(advertisement: Advertisement): Promise<[Advertisement, StartGamePacket]> {
+	private async waitForConnection(
+		advertisement: Advertisement,
+	): Promise<[Advertisement, StartGamePacket]> {
 		return new Promise((resolve, reject) => {
 			this.once("StartGamePacket", this.handleStartGamePacket.bind(this));
 			this.once("SetLocalPlayerAsInitializedPacket", () => {
 				this.status = Status.Connected;
 			});
-			
+
 			const interval = setInterval(() => {
 				if (
 					this.status === Status.Connected &&
@@ -151,7 +153,7 @@ class Client extends Emitter<ClientEvents> {
 		this.startGamePacket = packet;
 		this.runtimeEntityId = packet.runtimeEntityId;
 		if (this.cancelPastLogin) return;
-		
+
 		this.requestChunkRadius();
 	}
 
@@ -179,7 +181,7 @@ class Client extends Emitter<ClientEvents> {
 	): void {
 		try {
 			if (this.status === Status.Disconnected) return;
-			
+
 			const serialized =
 				packet instanceof DataPacket ? packet.serialize() : packet;
 			const compressed = this.packetCompressor.compress(
@@ -192,7 +194,10 @@ class Client extends Emitter<ClientEvents> {
 			frame.payload = compressed;
 			this.raknet.sendFrame(frame, priority);
 		} catch (error) {
-			Logger.error(`Failed to send packet ${packet instanceof DataPacket ? packet.constructor.name : 'Buffer'}`, error);
+			Logger.error(
+				`Failed to send packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
+				error,
+			);
 		}
 	}
 
@@ -201,7 +206,9 @@ class Client extends Emitter<ClientEvents> {
 	}
 
 	public queue(packet: DataPacket | Buffer): void {
-		Logger.debug(`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : 'Buffer'}`);
+		Logger.debug(
+			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
+		);
 		this.sendPacket(packet, Priority.Normal);
 	}
 
@@ -209,16 +216,17 @@ class Client extends Emitter<ClientEvents> {
 	public processPacket(buffer: Buffer): void {
 		const id = getPacketId(buffer);
 		let PacketClass = Packets[id];
-		
+
 		try {
 			if (id in ExtraPackets) {
 				PacketClass = ExtraPackets[id as keyof typeof ExtraPackets];
 			}
-			
+
 			if (!PacketClass || !PacketClass.name) {
-				return Logger.warn(`Unknown Game packet ${id}`);
+				Logger.warn(`Unknown Game packet ${id}`);
+				return;
 			}
-			
+
 			const hasSpecificListener = this.hasListeners(
 				PacketClass.name as PacketNames,
 			);
@@ -226,17 +234,20 @@ class Client extends Emitter<ClientEvents> {
 
 			if (hasSpecificListener || hasGenericListener) {
 				const deserializedPacket = new PacketClass(buffer).deserialize();
-				
+
 				if (hasSpecificListener) {
 					this.emit(PacketClass.name as PacketNames, deserializedPacket);
 				}
-				
+
 				if (hasGenericListener) {
 					this.emit("packet", deserializedPacket);
 				}
 			}
 		} catch (error) {
-			Logger.error(`Failed to process packet ${PacketClass?.name || id}`, error);
+			Logger.error(
+				`Failed to process packet ${PacketClass?.name || id}`,
+				error,
+			);
 		}
 	}
 
@@ -253,7 +264,7 @@ class Client extends Emitter<ClientEvents> {
 	private handleRaknetConnect(): void {
 		const timer = setInterval(() => {
 			if (!this.sessionReady) return;
-			
+
 			const request = new RequestNetworkSettingsPacket();
 			request.protocol = this.protocol;
 			this.send(request);
@@ -262,19 +273,31 @@ class Client extends Emitter<ClientEvents> {
 	}
 
 	private setupPacketListeners(): void {
-		this.once("NetworkSettingsPacket", this.handleNetworkSettingsPacket.bind(this));
-		this.once("ServerToClientHandshakePacket", this.handleServerHandshake.bind(this));
-		this.once("ResourcePacksInfoPacket", this.handleResourcePacksInfoPacket.bind(this));
+		this.once(
+			"NetworkSettingsPacket",
+			this.handleNetworkSettingsPacket.bind(this),
+		);
+		this.once(
+			"ServerToClientHandshakePacket",
+			this.handleServerHandshake.bind(this),
+		);
+		this.once(
+			"ResourcePacksInfoPacket",
+			this.handleResourcePacksInfoPacket.bind(this),
+		);
 		this.on("PlayStatusPacket", this.handlePlayStatusPacket.bind(this));
 	}
 
-	private handleNetworkSettingsPacket(packet: { compressionMethod: number; compressionThreshold: number }): void {
+	private handleNetworkSettingsPacket(packet: {
+		compressionMethod: number;
+		compressionThreshold: number;
+	}): void {
 		this._compressionEnabled = true;
 		this.options.compressionMethod = this.packetCompressor.getMethod(
 			packet.compressionMethod,
 		);
 		this.options.compressionThreshold = packet.compressionThreshold;
-		
+
 		const loginPacket = this.data.createLoginPacket();
 		this.send(loginPacket);
 	}
@@ -291,12 +314,12 @@ class Client extends Emitter<ClientEvents> {
 			type: "spki",
 			format: "der",
 		});
-		
+
 		this.data.sharedSecret = this.data.createSharedSecret(
 			this.data.loginData.ecdhKeyPair.privateKey,
 			pubKeyDer,
 		);
-		
+
 		const secretHash = createHash("sha256")
 			.update(new Uint8Array(Buffer.from(salt, "base64")))
 			.update(new Uint8Array(this.data.sharedSecret))
@@ -305,7 +328,7 @@ class Client extends Emitter<ClientEvents> {
 		this.secretKeyBytes = secretHash;
 		this.iv = secretHash.slice(0, 16);
 		this.startEncryption(this.iv);
-		
+
 		const handshake = new ClientToServerHandshakePacket();
 		this.send(handshake);
 	}
@@ -313,7 +336,7 @@ class Client extends Emitter<ClientEvents> {
 	private handlePlayStatusPacket(packet: PlayStatusPacket): void {
 		if (packet.status === PlayStatus.LoginSuccess) {
 		}
-		
+
 		if (packet.status === PlayStatus.PlayerSpawn && !this.cancelPastLogin) {
 			this.completePlayerSpawn();
 		}
@@ -324,9 +347,10 @@ class Client extends Emitter<ClientEvents> {
 		init.runtimeEntityId = this.runtimeEntityId;
 
 		const serverBoundLoadingScreen = new ServerboundLoadingScreenPacketPacket();
-		serverBoundLoadingScreen.type = ServerboundLoadingScreenType.EndLoadingScreen;
+		serverBoundLoadingScreen.type =
+			ServerboundLoadingScreenType.EndLoadingScreen;
 		serverBoundLoadingScreen.hasScreenId = false;
-		
+
 		this.send(init);
 		this.send(serverBoundLoadingScreen);
 		this.emit("SetLocalPlayerAsInitializedPacket", init);
@@ -336,12 +360,12 @@ class Client extends Emitter<ClientEvents> {
 		packet: ResourcePacksInfoPacket | ResourcePackStackPacket,
 	): void {
 		if (this.cancelPastLogin) return;
-		
+
 		const response = new ResourcePackClientResponsePacket();
 		response.packs = [];
 		response.response = ResourcePackResponse.Completed;
 		this.send(response);
-		
+
 		if (packet instanceof ResourcePacksInfoPacket) {
 			this.send(ClientCacheStatusPacket.create(false));
 		}
@@ -354,7 +378,7 @@ class Client extends Emitter<ClientEvents> {
 
 	public disconnect(): void {
 		if (this.status === Status.Disconnected) return;
-		
+
 		this.status = Status.Disconnected;
 		try {
 			this.cleanup();
@@ -366,16 +390,16 @@ class Client extends Emitter<ClientEvents> {
 	private cleanup(): void {
 		this.removeAllListeners();
 		this.destroy();
-		
+
 		if (this.raknet) {
 			this.raknet.disconnect();
 		}
-		
+
 		if (this.packetEncryptor) {
 			this.packetEncryptor.destroy();
 			this._encryptionEnabled = false;
 		}
-		
+
 		Logger.cleanup();
 	}
 
@@ -394,4 +418,3 @@ class Client extends Emitter<ClientEvents> {
 }
 
 export { Client };
-

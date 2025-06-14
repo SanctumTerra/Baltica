@@ -12,7 +12,7 @@ import {
 	UpdateBlockSyncPacket,
 } from "../network/packets";
 import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
-import type {SkinData} from "./types/payload";
+import type { SkinData } from "./types/payload";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
@@ -137,10 +137,15 @@ export {
 	type PacketNames,
 };
 
-export type ExtraPacketType = typeof LevelChunkPacket | typeof AddPaintingPacket |
-  typeof UpdateSubchunkBlocksPacket | typeof MotionPredictHintsPacket |
-  typeof SetLastHurtByPacket | typeof SetDefaultGamemodePacket |
-  typeof UpdatePlayerGameTypePacket | typeof UpdateBlockSyncPacket;
+export type ExtraPacketType =
+	| typeof LevelChunkPacket
+	| typeof AddPaintingPacket
+	| typeof UpdateSubchunkBlocksPacket
+	| typeof MotionPredictHintsPacket
+	| typeof SetLastHurtByPacket
+	| typeof SetDefaultGamemodePacket
+	| typeof UpdatePlayerGameTypePacket
+	| typeof UpdateBlockSyncPacket;
 
 export const ExtraPackets: Record<number, ExtraPacketType> = {
 	[58]: LevelChunkPacket,

@@ -55,7 +55,7 @@ export class Bridge extends Server {
 			CLIENT_CACHE_STATUS_ID,
 			ClientCacheStatusPacket as unknown as PacketConstructor,
 		);
-		
+
 		const levelChunkId = (LevelChunkPacket as unknown as { id: number }).id;
 		if (levelChunkId !== undefined) {
 			this.packetClassCache.set(
@@ -111,15 +111,17 @@ export class Bridge extends Server {
 					new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
 				);
 			} catch (e) {
-				Logger.error(`Failed to deserialize LevelChunkPacket for queueing`, e);
-				sender.send(buffer); 
+				Logger.error("Failed to deserialize LevelChunkPacket for queueing", e);
+				sender.send(buffer);
 			}
 			return;
 		}
-		
+
 		if (packetName === "ItemStackRequestPacket") {
 			if (this.debugLog) {
-				Logger.info(`Passing through ItemStackRequestPacket (ID: ${id}) without processing.`);
+				Logger.info(
+					`Passing through ItemStackRequestPacket (ID: ${id}) without processing.`,
+				);
 			}
 			sender.send(buffer);
 			return;
@@ -164,11 +166,14 @@ export class Bridge extends Server {
 		try {
 			packet = new CachedPacketClass(buffer).deserialize();
 		} catch (e) {
-			Logger.error(`Failed to deserialize ${packetName} (ID: ${id}). Sending original buffer.`, e);
+			Logger.error(
+				`Failed to deserialize ${packetName} (ID: ${id}). Sending original buffer.`,
+				e,
+			);
 			sender.send(buffer);
 			return;
 		}
-		
+
 		if (packet instanceof ClientCacheStatusPacket) {
 			packet.enabled = false;
 			Logger.warn(`Modified and dropping ClientCacheStatusPacket (ID: ${id})`);
@@ -197,12 +202,13 @@ export class Bridge extends Server {
 		let bridgeMadeModifications = false;
 		if ("binary" in packet && packet.binary !== undefined) {
 			if (!Array.isArray(packet.binary) || packet.binary.length > 0) {
-				(packet as any).binary = [];
+				(packet as ProtocolPacket & { binary: unknown[] }).binary = [];
 				bridgeMadeModifications = true;
 			}
 		}
 
-		const requiresSerialization = eventStatus.modified || bridgeMadeModifications;
+		const requiresSerialization =
+			eventStatus.modified || bridgeMadeModifications;
 		if (requiresSerialization) {
 			if (this.debugLog) {
 				Logger.info(
@@ -214,7 +220,10 @@ export class Bridge extends Server {
 				this.packetSerializationCache.set(cacheKey, newSerializedBuffer);
 				sender.send(newSerializedBuffer);
 			} catch (e) {
-				Logger.error(`Failed to serialize modified ${packetName} (ID: ${id}). Sending original buffer.`, e);
+				Logger.error(
+					`Failed to serialize modified ${packetName} (ID: ${id}). Sending original buffer.`,
+					e,
+				);
 				sender.send(buffer);
 			}
 		} else {
@@ -254,7 +263,7 @@ export class Bridge extends Server {
 
 	public onConnect(player: Player) {
 		if (!(player.connection instanceof Connection)) return;
-	
+
 		const bridgePlayer = new BridgePlayer(this, player);
 		const address = player.connection.getAddress();
 		const playerKey = `${address.address}:${address.port}`;
@@ -335,11 +344,14 @@ export class Bridge extends Server {
 			client.send(packet.serialize());
 		});
 
-		player.once("serverbound-ResourcePackClientResponsePacket", (packet, eventStatus) => {
-			const responsePacket = new ClientCacheStatusPacket();
-			responsePacket.enabled = false;
-			player.player.send(responsePacket.serialize());
-		});
+		player.once(
+			"serverbound-ResourcePackClientResponsePacket",
+			(packet, eventStatus) => {
+				const responsePacket = new ClientCacheStatusPacket();
+				responsePacket.enabled = false;
+				player.player.send(responsePacket.serialize());
+			},
+		);
 
 		client.once("PlayStatusPacket", (packet) => {
 			if (packet.status !== PlayStatus.LoginSuccess) {

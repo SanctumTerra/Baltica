@@ -72,7 +72,7 @@ export type SkinData = {
 	PremiumSkin: boolean;
 	SkinAnimationData: string;
 	SkinColor: string;
-	SkinData: string;	
+	SkinData: string;
 	SkinGeometryData: string;
 	SkinGeometryDataEngineVersion: string;
 	SkinId: string;
@@ -80,7 +80,7 @@ export type SkinData = {
 	SkinImageWidth: number;
 	SkinResourcePatch: string;
 	TrustedSkin: boolean;
-}
+};
 
 export const createDefaultPayload = (client: Client | Player): Payload => {
 	const username = client.profile?.name ?? client.options.username;
