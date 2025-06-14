@@ -50,13 +50,35 @@ export class Server extends Emitter<ServerEvents> {
 				throw new Error("Connection is not instance of Connection");
 
 			const connectionKey = this.getConnectionKey(connection);
-			if (this.connections.has(connectionKey)) return;
+			const existingPlayer = this.connections.get(connectionKey);
 
+			if (existingPlayer) {
+				Logger.warn(
+					`Disconnecting existing player ${existingPlayer.profile?.name ?? connectionKey} due to new connection from the same address.`,
+				);
+				// Send a disconnect packet to the existing player
+				const disconnectPacket = new DisconnectPacket();
+				disconnectPacket.message = new DisconnectMessage(
+					"You were disconnected because a new connection was made from your IP address.",
+				);
+				disconnectPacket.reason = DisconnectReason.Kicked;
+				disconnectPacket.hideDisconnectScreen = false;
+				try {
+					existingPlayer.send(disconnectPacket); // Assuming Player class has a send method for Protocol packets
+					// Optionally, also force close RakNet connection if send isn't enough or player is unresponsive
+					existingPlayer.connection.disconnect(); 
+				} catch (error) {
+					Logger.error(`Error sending disconnect to existing player ${connectionKey}:`, error);
+				}
+				this.onDisconnect(existingPlayer); // Ensure cleanup and event emission
+			}
+
+			// Proceed to create and connect the new player
 			const player = new Player(this, connection);
 			this.connections.set(connectionKey, player);
 			this.emit("playerConnect", player);
 			const { address, port } = connection.getAddress();
-			Logger.info("Player connected from: ", `${address}:${port}`);
+			Logger.info(`Player connected from: ${address}:${port}`);
 		});
 
 		this.raknet.start();

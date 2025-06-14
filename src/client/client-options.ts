@@ -12,6 +12,7 @@ import {
 	UpdateBlockSyncPacket,
 } from "../network/packets";
 import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
+import type {SkinData} from "./types/payload";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
@@ -56,11 +57,15 @@ type ClientOptions = {
 	username: string;
 	tokensFolder: string;
 	viewDistance: number;
-	skinData: object | undefined;
+	skinData: SkinData | undefined;
 	offline: boolean;
 	worker: boolean;
 	loginOptions: LoginPacketOptions;
 	betaAuth: boolean;
+	platformType: number;
+	memoryTier: number;
+	uiProfile: number;
+	graphicsMode: number;
 };
 
 const defaultClientOptions: ClientOptions = {
@@ -78,11 +83,15 @@ const defaultClientOptions: ClientOptions = {
 	offline: false,
 	worker: false,
 	loginOptions: {
-		DeviceModel: "SwimmingPool",
+		DeviceModel: "Beans something something",
 		CurrentInputMode: InputMode.GamePad,
 		DefaultInputMode: InputMode.GamePad,
 	},
 	betaAuth: false,
+	platformType: 2,
+	memoryTier: 2,
+	uiProfile: 0,
+	graphicsMode: 0,
 };
 
 // : Record<number, typeof DataPacket>

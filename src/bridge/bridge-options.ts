@@ -9,17 +9,17 @@ import {
 export type BridgePlayerEvents = {
 	[K in PacketNames as `clientbound-${K}`]: [
 		packet: InstanceType<(typeof Protocol)[K]>,
-		cancelled: boolean,
+		eventStatus: { cancelled: boolean; modified: boolean },
 	];
 } & {
 	[K in PacketNames as `serverbound-${K}`]: [
 		packet: InstanceType<(typeof Protocol)[K]>,
-		cancelled: boolean,
+		eventStatus: { cancelled: boolean; modified: boolean },
 	];
 } & {
 	"serverbound-ClientCacheStatusPacket": [
 		packet: ClientCacheStatusPacket,
-		cancelled: boolean,
+		eventStatus: { cancelled: boolean; modified: boolean },
 	];
 };
 
@@ -37,5 +37,6 @@ export const defaultBridgeOptions: BridgeOptions = {
 		host: "127.0.0.1",
 		port: 19132,
 	},
+	levelName: "SanctumTerra Server",
 	offline: false,
 };

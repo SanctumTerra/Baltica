@@ -24,17 +24,12 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 		this.player = player;
 		this.postStartGame = false;
 		this.levelChunkQueue = [];
-		this.once("clientbound-StartGamePacket", (packet) => {
+		this.once("clientbound-StartGamePacket", (packet, eventStatus) => {
 			this.postStartGame = true;
 			for (const chunk of this.levelChunkQueue) {
 				const eventName =
 					"clientbound-LevelChunkPacket" as keyof BridgePlayerEvents & string;
-				this.emit(eventName, chunk, false);
-				if ("binary" in packet) {
-					packet.binary = [];
-				}
-				const newBuffer = chunk.serialize();
-				this.player.send(newBuffer);
+				this.emit(eventName, chunk, { cancelled: false, modified: false });
 			}
 		});
 	}

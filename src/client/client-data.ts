@@ -99,7 +99,10 @@ class ClientData {
 
 	public async createClientUserChain(privateKey: KeyObject): Promise<string> {
 		const { clientX509 } = this.loginData;
-		const customPayload = this.client.options.skinData || {};
+		// Partial Payload
+		const customPayload = {
+			...this.client.options.skinData
+		};
 
 		const payload: Payload = {
 			...this.payload,

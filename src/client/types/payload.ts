@@ -58,6 +58,30 @@ export type Payload = {
 	GraphicsMode: number;
 };
 
+export type SkinData = {
+	AnimatedImageData: AnimatedImageData[];
+	ArmSize: string;
+	CapeData: string;
+	CapeId: string;
+	CapeImageHeight: number;
+	CapeImageWidth: number;
+	CapeOnClassicSkin: boolean;
+	PieceTintColors: PieceTintColors[];
+	PersonaPieces: PersonaPieces[];
+	PersonaSkin: boolean;
+	PremiumSkin: boolean;
+	SkinAnimationData: string;
+	SkinColor: string;
+	SkinData: string;	
+	SkinGeometryData: string;
+	SkinGeometryDataEngineVersion: string;
+	SkinId: string;
+	SkinImageHeight: number;
+	SkinImageWidth: number;
+	SkinResourcePatch: string;
+	TrustedSkin: boolean;
+}
+
 export const createDefaultPayload = (client: Client | Player): Payload => {
 	const username = client.profile?.name ?? client.options.username;
 	const payload = {
@@ -80,14 +104,14 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		IsEditorMode: false,
 		LanguageCode: "en_US",
 		MaxViewDistance: client.options?.viewDistance,
-		MemoryTier: 2,
+		MemoryTier: client.options.memoryTier,
 		OverrideSkin: false,
 		PersonaPieces: skin.skinData.PersonaPieces,
 		PersonaSkin: skin.skinData.PersonaSkin,
 		PieceTintColors: skin.skinData.PieceTintColors,
 		PlatformOfflineId: ClientData.nextUUID(username).replace(/-/g, ""),
 		PlatformOnlineId: ClientData.OnlineId(),
-		PlatformType: 2,
+		PlatformType: client.options.platformType,
 		// PlatformUserId: "",
 		PlayFabId: ClientData.nextUUID(username).replace(/-/g, "").slice(0, 16),
 		PremiumSkin: skin.skinData.PremiumSkin,
@@ -105,8 +129,8 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		ThirdPartyName: username,
 		ThirdPartyNameOnly: false,
 		TrustedSkin: skin.skinData.TrustedSkin,
-		UIProfile: 0,
-		GraphicsMode: 0,
+		UIProfile: client.options.uiProfile,
+		GraphicsMode: client.options.graphicsMode,
 	};
 	return payload;
 };

@@ -8,7 +8,7 @@ import {
 	getPacketId,
 } from "@serenityjs/protocol";
 import * as Protocol from "@serenityjs/protocol";
-import { Client, type PacketNames } from "../client";
+import { Client, DeviceOS, SkinData, type PacketNames } from "../client";
 import type { ForceArray } from "../libs";
 import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import { type Player, Server, type ServerEvents } from "../server";
@@ -55,7 +55,7 @@ export class Bridge extends Server {
 			CLIENT_CACHE_STATUS_ID,
 			ClientCacheStatusPacket as unknown as PacketConstructor,
 		);
-
+		
 		const levelChunkId = (LevelChunkPacket as unknown as { id: number }).id;
 		if (levelChunkId !== undefined) {
 			this.packetClassCache.set(
@@ -91,72 +91,138 @@ export class Bridge extends Server {
 		const id = getPacketId(buffer);
 		const PacketClass = Packets[id as keyof typeof Packets];
 		const packetName = PacketClass?.name ?? "ClientCacheStatusPacket";
+		console.log(packetName);
+
 		const eventName =
 			`${isClientbound ? "clientbound" : "serverbound"}-${packetName}` as keyof BridgePlayerEvents &
 				string;
 
 		if (!PacketClass && (id as number) !== 129) {
+			if (this.debugLog) {
+				Logger.info(`Passing through unknown packet ID: ${id}`);
+			}
 			sender.send(buffer);
 			return;
 		}
 
 		if (packetName === "LevelChunkPacket" && !player.postStartGame) {
-			player.levelChunkQueue.push(
-				new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
-			);
+			try {
+				player.levelChunkQueue.push(
+					new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
+				);
+			} catch (e) {
+				Logger.error(`Failed to deserialize LevelChunkPacket for queueing`, e);
+				sender.send(buffer); 
+			}
 			return;
 		}
-
-		if (
-			!player.hasListeners(eventName) &&
-			packetName !== "ClientCacheStatusPacket"
-		) {
+		
+		if (packetName === "ItemStackRequestPacket") {
+			if (this.debugLog) {
+				Logger.info(`Passing through ItemStackRequestPacket (ID: ${id}) without processing.`);
+			}
 			sender.send(buffer);
 			return;
 		}
 
-		try {
-			const CachedPacketClass = this.getPacketClass(id, PacketClass);
-			if (!CachedPacketClass) {
-				sender.send(buffer);
-				return;
-			}
+		const hasListeners = player.hasListeners(eventName);
+		const isClientCachePacket = packetName === "ClientCacheStatusPacket";
+		const needsProcessing = hasListeners || isClientCachePacket;
 
+		if (!needsProcessing) {
 			if (this.debugLog) {
 				Logger.info(
-					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName}`,
+					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (No listeners/special handling, sending original)`,
 				);
 			}
+			sender.send(buffer);
+			return;
+		}
 
-			const cacheKey = `${id}-${buffer.toString("hex")}`;
-			let newBuffer = this.packetSerializationCache.get(cacheKey);
-
-			if (!newBuffer) {
-				const packet = new CachedPacketClass(
-					buffer,
-				).deserialize() as ProtocolPacket;
-
-				if (packet instanceof ClientCacheStatusPacket) {
-					packet.enabled = false;
-					Logger.warn("Ignoring ClientCacheStatusPacket");
-					return;
-				}
-
-				const cancelled = false;
-				player.emit(eventName, packet, cancelled);
-				if (cancelled) return;
-
-				if ("binary" in packet) {
-					packet.binary = [];
-				}
-
-				newBuffer = packet.serialize();
-				this.packetSerializationCache.set(cacheKey, newBuffer);
+		const cacheKey = `${id}-${buffer.toString("hex")}`;
+		const cachedSerializedBuffer = this.packetSerializationCache.get(cacheKey);
+		if (cachedSerializedBuffer) {
+			if (this.debugLog) {
+				Logger.info(
+					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (Sending cached serialized)`,
+				);
 			}
+			sender.send(cachedSerializedBuffer);
+			return;
+		}
 
-			sender.send(newBuffer);
+		const CachedPacketClass = this.getPacketClass(id, PacketClass);
+		if (!CachedPacketClass) {
+			Logger.warn(
+				`Could not get packet class for ${packetName} (ID: ${id}) despite needing processing. Sending original.`,
+			);
+			sender.send(buffer);
+			return;
+		}
+
+		let packet: ProtocolPacket;
+		try {
+			packet = new CachedPacketClass(buffer).deserialize();
 		} catch (e) {
-			Logger.error(`Failed to process ${packetName}`, e);
+			Logger.error(`Failed to deserialize ${packetName} (ID: ${id}). Sending original buffer.`, e);
+			sender.send(buffer);
+			return;
+		}
+		
+		if (packet instanceof ClientCacheStatusPacket) {
+			packet.enabled = false;
+			Logger.warn(`Modified and dropping ClientCacheStatusPacket (ID: ${id})`);
+			return;
+		}
+
+		const eventStatus = { cancelled: false, modified: false };
+		if (hasListeners) {
+			if (this.debugLog) {
+				Logger.info(
+					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (Emitting event)`,
+				);
+			}
+			player.emit(eventName, packet, eventStatus);
+
+			if (eventStatus.cancelled) {
+				if (this.debugLog) {
+					Logger.info(
+						`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (Cancelled by listener)`,
+					);
+				}
+				return;
+			}
+		}
+
+		let bridgeMadeModifications = false;
+		if ("binary" in packet && packet.binary !== undefined) {
+			if (!Array.isArray(packet.binary) || packet.binary.length > 0) {
+				(packet as any).binary = [];
+				bridgeMadeModifications = true;
+			}
+		}
+
+		const requiresSerialization = eventStatus.modified || bridgeMadeModifications;
+		if (requiresSerialization) {
+			if (this.debugLog) {
+				Logger.info(
+					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (Re-serializing after modification)`,
+				);
+			}
+			try {
+				const newSerializedBuffer = packet.serialize();
+				this.packetSerializationCache.set(cacheKey, newSerializedBuffer);
+				sender.send(newSerializedBuffer);
+			} catch (e) {
+				Logger.error(`Failed to serialize modified ${packetName} (ID: ${id}). Sending original buffer.`, e);
+				sender.send(buffer);
+			}
+		} else {
+			if (this.debugLog) {
+				Logger.info(
+					`${isClientbound ? "Client -> BridgePlayer" : "BridgePlayer -> Client"} : ${packetName} (ID: ${id}) (Processed, not modified, sending original)`,
+				);
+			}
 			sender.send(buffer);
 		}
 	}
@@ -188,14 +254,13 @@ export class Bridge extends Server {
 
 	public onConnect(player: Player) {
 		if (!(player.connection instanceof Connection)) return;
-
+	
 		const bridgePlayer = new BridgePlayer(this, player);
 		const address = player.connection.getAddress();
 		const playerKey = `${address.address}:${address.port}`;
 
 		this.clients.set(playerKey, bridgePlayer);
 		this.emit("connect", bridgePlayer);
-
 		bridgePlayer.player.once(
 			"ClientCacheStatusPacket",
 			(packet: ClientCacheStatusPacket) => {
@@ -209,15 +274,53 @@ export class Bridge extends Server {
 	}
 
 	public onLogin(player: BridgePlayer) {
+		console.log("Creating Client");
+
+		const payload = player.player.data.payload;
+
 		const client = new Client({
 			host: this.options.destination.host,
 			port: this.options.destination.port,
 			version: this.options.version,
 			tokensFolder: "tokens",
-			viewDistance: 2,
+			viewDistance: payload.MaxViewDistance,
 			worker: true,
 			offline: this.options.offline,
+			deviceOS: payload.DeviceOS,
+			skinData: {
+				AnimatedImageData: payload.AnimatedImageData,
+				ArmSize: payload.ArmSize,
+				SkinData: payload.SkinData,
+				TrustedSkin: payload.TrustedSkin,
+				CapeData: payload.CapeData,
+				CapeId: payload.CapeId,
+				CapeImageHeight: payload.CapeImageHeight,
+				CapeImageWidth: payload.CapeImageWidth,
+				CapeOnClassicSkin: payload.CapeOnClassicSkin,
+				PersonaPieces: payload.PersonaPieces,
+				PieceTintColors: payload.PieceTintColors,
+				PersonaSkin: payload.PersonaSkin,
+				PremiumSkin: payload.PremiumSkin,
+				SkinAnimationData: payload.SkinAnimationData,
+				SkinColor: payload.SkinColor,
+				SkinGeometryData: payload.SkinGeometryData,
+				SkinGeometryDataEngineVersion: payload.SkinGeometryDataEngineVersion,
+				SkinId: payload.SkinId,
+				SkinImageHeight: payload.SkinImageHeight,
+				SkinImageWidth: payload.SkinImageWidth,
+				SkinResourcePatch: payload.SkinResourcePatch,
+			},
+			loginOptions: {
+				CurrentInputMode: payload.CurrentInputMode,
+				DefaultInputMode: payload.DefaultInputMode,
+				DeviceModel: payload.DeviceModel,
+			},
+			platformType: payload.PlatformType,
+			memoryTier: payload.MemoryTier,
+			uiProfile: payload.UIProfile,
+			graphicsMode: payload.GraphicsMode,
 		});
+
 		console.log(this.options);
 
 		player.client = client;
@@ -232,10 +335,10 @@ export class Bridge extends Server {
 			client.send(packet.serialize());
 		});
 
-		player.once("serverbound-ResourcePackClientResponsePacket", () => {
-			const packet = new ClientCacheStatusPacket();
-			packet.enabled = false;
-			player.player.send(packet.serialize());
+		player.once("serverbound-ResourcePackClientResponsePacket", (packet, eventStatus) => {
+			const responsePacket = new ClientCacheStatusPacket();
+			responsePacket.enabled = false;
+			player.player.send(responsePacket.serialize());
 		});
 
 		client.once("PlayStatusPacket", (packet) => {

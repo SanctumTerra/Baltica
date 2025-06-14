@@ -17,11 +17,11 @@ const bridge = new Bridge({
 
 bridge.on("connect", (player) => {
 	console.log("Player connected: ", player.player?.profile?.name ?? "Unknown");
-	player.on("clientbound-AvailableCommandsPacket", (packet) => {
+	player.on("clientbound-AvailableCommandsPacket", (packet, eventStatus) => {
 		pushCommand(player, packet);
 	});
-	player.on("serverbound-CommandRequestPacket", (packet, cancelled) => {
-		handleCommand(player, packet, cancelled);
+	player.on("serverbound-CommandRequestPacket", (packet, eventStatus) => {
+		handleCommand(player, packet, eventStatus);
 	});
 });
 
@@ -39,14 +39,14 @@ function handler(
 	player: BridgePlayer,
 	modal: ModalFormRequestPacket,
 	packet: ModalFormResponsePacket,
-	cancelled: boolean,
+	eventStatus: { cancelled: boolean, modified: boolean },
 ) {
 	if (packet.id !== modal.id) return;
     const text = generateTextPacket(`Hey ${player.player?.profile?.name ?? player.player.data.payload.ThirdPartyName}`);
     player.player.send(text);   
     // Incase of using Biome Linter.
 	// biome-ignore lint/style/noParameterAssign: <explanation>
-	cancelled = true;
+	eventStatus.cancelled = true;
 }
 
 function generateTextPacket(message: string) {
@@ -65,10 +65,10 @@ function generateTextPacket(message: string) {
 function handleCommand(
 	player: BridgePlayer,
 	packet: CommandRequestPacket,
-	cancelled: boolean,
+	eventStatus: { cancelled: boolean, modified: boolean },
 ) {
 	// biome-ignore lint/style/noParameterAssign: <ring ring>
-	cancelled = true;
+	eventStatus.cancelled = true;
 	const allowed = ["/bridge"];
 	console.log(packet.command);
 	if (!allowed.includes(packet.command)) return;
@@ -87,7 +87,7 @@ function handleCommand(
 	modal.id = rand(10000);
 	modal.payload = payload;
 	player.player.send(modal);
-	player.on("serverbound-ModalFormResponsePacket", (packet, cancelled) => {
-		handler(player, modal, packet, cancelled);
+	player.on("serverbound-ModalFormResponsePacket", (packetModal, eventStatusModal) => {
+		handler(player, modal, packetModal, eventStatusModal);
 	});
 }
