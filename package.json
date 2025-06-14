@@ -1,7 +1,7 @@
 {
 	"name": "baltica",
 	"description": "A MCBE Utility Library",
-	"version": "0.0.09",
+	"version": "0.0.10",
 	"minecraft": "1.21.80",
 	"type": "commonjs",
 	"main": "dist/index.js",
