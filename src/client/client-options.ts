@@ -137,7 +137,12 @@ export {
 	type PacketNames,
 };
 
-export const ExtraPackets = {
+export type ExtraPacketType = typeof LevelChunkPacket | typeof AddPaintingPacket |
+  typeof UpdateSubchunkBlocksPacket | typeof MotionPredictHintsPacket |
+  typeof SetLastHurtByPacket | typeof SetDefaultGamemodePacket |
+  typeof UpdatePlayerGameTypePacket | typeof UpdateBlockSyncPacket;
+
+export const ExtraPackets: Record<number, ExtraPacketType> = {
 	[58]: LevelChunkPacket,
 	[22]: AddPaintingPacket,
 	[172]: UpdateSubchunkBlocksPacket,

@@ -45,16 +45,16 @@ import {
 	type ClientEvents,
 	type ClientOptions,
 	ExtraPackets,
+	type ExtraPacketType,
 	type PacketNames,
 	ProtocolList,
 	defaultClientOptions,
 } from "./client-options";
 import { WorkerClient } from "./worker";
-import { AddPaintingPacket } from "../network/packets";
-import DisconnectionNotification from "@sanctumterra/raknet/dist/proto/packets/disconnect";
-import { UpdateSubchunkBlocksPacket } from "../network/packets/update-subchunk-blocks";
-import { MotionPredictHintsPacket } from "src/network/packets/motion-predict-hints";
-import { SetLastHurtByPacket } from "src/network/packets/set-last-hurt-by";
+
+const RETRY_INTERVAL_MS = 50;
+const CONNECTION_CHECK_INTERVAL_MS = 50;
+const NETWORK_SETTINGS_RETRY_INTERVAL_MS = 50;
 
 class Client extends Emitter<ClientEvents> {
 	public raknet: RaknetClient | WorkerClient;
@@ -100,24 +100,39 @@ class Client extends Emitter<ClientEvents> {
 		this.once("session", () => {
 			this.sessionReady = true;
 		});
+		this.initializeSession();
+	}
+
+	private initializeSession(): void {
 		this.options.offline ? createOfflineSession(this) : authenticate(this);
 	}
 
 	public async connect(): Promise<[Advertisement, StartGamePacket]> {
-		while (!this.sessionReady) {
-			await new Promise((resolve) => setTimeout(resolve, 10));
-		}
+		await this.waitForSessionReady();
+		
 		this.status = Status.Connecting;
 		this.packetCompressor = new PacketCompressor(this);
-		this.listen();
+		this.setupEventListeners();
+		
 		const advertisement = await this.raknet.connect();
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
 
+		return this.waitForConnection(advertisement);
+	}
+
+	private async waitForSessionReady(): Promise<void> {
+		while (!this.sessionReady) {
+			await new Promise((resolve) => setTimeout(resolve, RETRY_INTERVAL_MS));
+		}
+	}
+
+	private async waitForConnection(advertisement: Advertisement): Promise<[Advertisement, StartGamePacket]> {
 		return new Promise((resolve, reject) => {
 			this.once("StartGamePacket", this.handleStartGamePacket.bind(this));
 			this.once("SetLocalPlayerAsInitializedPacket", () => {
 				this.status = Status.Connected;
 			});
+			
 			const interval = setInterval(() => {
 				if (
 					this.status === Status.Connected &&
@@ -128,7 +143,7 @@ class Client extends Emitter<ClientEvents> {
 					this.emit("connect", advertisement);
 					resolve([advertisement, this.startGamePacket]);
 				}
-			}, 50);
+			}, CONNECTION_CHECK_INTERVAL_MS);
 		});
 	}
 
@@ -136,13 +151,18 @@ class Client extends Emitter<ClientEvents> {
 		this.startGamePacket = packet;
 		this.runtimeEntityId = packet.runtimeEntityId;
 		if (this.cancelPastLogin) return;
+		
+		this.requestChunkRadius();
+	}
+
+	private requestChunkRadius(): void {
 		const radius = new RequestChunkRadiusPacket();
 		radius.radius = this.options.viewDistance;
 		radius.maxRadius = this.options.viewDistance;
 		this.send(radius);
 	}
 
-	private handleEncapsulated(buffer: Buffer) {
+	private handleEncapsulated(buffer: Buffer): void {
 		try {
 			const packets = this.packetCompressor.decompress(buffer);
 			for (const packet of packets) {
@@ -156,9 +176,10 @@ class Client extends Emitter<ClientEvents> {
 	private sendPacket(
 		packet: DataPacket | Buffer,
 		priority: Priority = Priority.Normal,
-	) {
+	): void {
 		try {
 			if (this.status === Status.Disconnected) return;
+			
 			const serialized =
 				packet instanceof DataPacket ? packet.serialize() : packet;
 			const compressed = this.packetCompressor.compress(
@@ -171,152 +192,191 @@ class Client extends Emitter<ClientEvents> {
 			frame.payload = compressed;
 			this.raknet.sendFrame(frame, priority);
 		} catch (error) {
-			Logger.error(`Failed to send packet ${packet.constructor.name}`, error);
+			Logger.error(`Failed to send packet ${packet instanceof DataPacket ? packet.constructor.name : 'Buffer'}`, error);
 		}
 	}
 
-	public send(packet: DataPacket | Buffer) {
+	public send(packet: DataPacket | Buffer): void {
 		this.sendPacket(packet, Priority.Immediate);
 	}
 
-	public queue(packet: DataPacket | Buffer) {
-		Logger.debug(`Queueing packet ${packet.constructor.name}`);
+	public queue(packet: DataPacket | Buffer): void {
+		Logger.debug(`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : 'Buffer'}`);
 		this.sendPacket(packet, Priority.Normal);
 	}
 
 	/** Already decompressed packets */
-	public processPacket(buffer: Buffer) {
+	public processPacket(buffer: Buffer): void {
 		const id = getPacketId(buffer);
 		let PacketClass = Packets[id];
-		// Logger.info(`Processing packet ${PacketClass.name ?? "unknown"} - ${id}`);
+		
 		try {
-			// @ts-ignore
-			if (id in ExtraPackets) (PacketClass as unknown) = ExtraPackets[id];
-			if ((!Packets && !Packets[id]) || !PacketClass || !PacketClass.name)
+			if (id in ExtraPackets) {
+				PacketClass = ExtraPackets[id as keyof typeof ExtraPackets];
+			}
+			
+			if (!PacketClass || !PacketClass.name) {
 				return Logger.warn(`Unknown Game packet ${id}`);
+			}
+			
 			const hasSpecificListener = this.hasListeners(
 				PacketClass.name as PacketNames,
 			);
 			const hasGenericListener = this.hasListeners("packet");
 
-			let deserializedPacket: DataPacket | undefined;
-
 			if (hasSpecificListener || hasGenericListener) {
-				deserializedPacket = new PacketClass(buffer).deserialize();
-				if (hasSpecificListener)
+				const deserializedPacket = new PacketClass(buffer).deserialize();
+				
+				if (hasSpecificListener) {
 					this.emit(PacketClass.name as PacketNames, deserializedPacket);
-				if (hasGenericListener) this.emit("packet", deserializedPacket);
+				}
+				
+				if (hasGenericListener) {
+					this.emit("packet", deserializedPacket);
+				}
 			}
 		} catch (error) {
-			Logger.error(`Failed to process packet ${PacketClass.name}`, error);
+			Logger.error(`Failed to process packet ${PacketClass?.name || id}`, error);
 		}
 	}
 
-	public listen() {
-		this.raknet.once("connect", () => {
-			const timer = setInterval(() => {
-				if (!this.sessionReady) return;
-				const request = new RequestNetworkSettingsPacket();
-				request.protocol = this.protocol;
-				this.send(request);
-				clearInterval(timer);
-			}, 50);
-		});
+	private setupEventListeners(): void {
+		this.setupConnectionListeners();
+		this.setupPacketListeners();
+	}
+
+	private setupConnectionListeners(): void {
+		this.raknet.once("connect", this.handleRaknetConnect.bind(this));
 		this.raknet.on("close", () => this.disconnect());
+	}
 
-		this.once("NetworkSettingsPacket", (packet) => {
-			this._compressionEnabled = true;
-			this.options.compressionMethod = this.packetCompressor.getMethod(
-				packet.compressionMethod,
-			);
-			this.options.compressionThreshold = packet.compressionThreshold;
-			const loginPacket = this.data.createLoginPacket();
-			this.send(loginPacket);
-		});
+	private handleRaknetConnect(): void {
+		const timer = setInterval(() => {
+			if (!this.sessionReady) return;
+			
+			const request = new RequestNetworkSettingsPacket();
+			request.protocol = this.protocol;
+			this.send(request);
+			clearInterval(timer);
+		}, NETWORK_SETTINGS_RETRY_INTERVAL_MS);
+	}
 
-		this.once("ServerToClientHandshakePacket", (packet) => {
-			const [header, payload] = packet.token
-				.split(".")
-				.map((k: unknown) => Buffer.from(k as string, "base64"));
-			const { x5u } = JSON.parse(header.toString());
-			const { salt } = JSON.parse(payload.toString());
-
-			const pubKeyDer = createPublicKey({
-				key: Buffer.from(x5u, "base64"),
-				type: "spki",
-				format: "der",
-			});
-			this.data.sharedSecret = this.data.createSharedSecret(
-				this.data.loginData.ecdhKeyPair.privateKey,
-				pubKeyDer,
-			);
-			const secretHash = createHash("sha256")
-				.update(new Uint8Array(Buffer.from(salt, "base64")))
-				.update(new Uint8Array(this.data.sharedSecret))
-				.digest();
-
-			this.secretKeyBytes = secretHash;
-			this.iv = secretHash.slice(0, 16);
-			this.startEncryption(this.iv);
-			const handshake = new ClientToServerHandshakePacket();
-			this.send(handshake);
-		});
-
-		this.once(
-			"ResourcePacksInfoPacket",
-			this.handleResourcePacksInfoPacket.bind(this),
-		);
+	private setupPacketListeners(): void {
+		this.once("NetworkSettingsPacket", this.handleNetworkSettingsPacket.bind(this));
+		this.once("ServerToClientHandshakePacket", this.handleServerHandshake.bind(this));
+		this.once("ResourcePacksInfoPacket", this.handleResourcePacksInfoPacket.bind(this));
 		this.on("PlayStatusPacket", this.handlePlayStatusPacket.bind(this));
 	}
 
-	private handlePlayStatusPacket(packet: PlayStatusPacket) {
+	private handleNetworkSettingsPacket(packet: { compressionMethod: number; compressionThreshold: number }): void {
+		this._compressionEnabled = true;
+		this.options.compressionMethod = this.packetCompressor.getMethod(
+			packet.compressionMethod,
+		);
+		this.options.compressionThreshold = packet.compressionThreshold;
+		
+		const loginPacket = this.data.createLoginPacket();
+		this.send(loginPacket);
+	}
+
+	private handleServerHandshake(packet: { token: string }): void {
+		const [header, payload] = packet.token
+			.split(".")
+			.map((k: string) => Buffer.from(k, "base64"));
+		const { x5u } = JSON.parse(header.toString());
+		const { salt } = JSON.parse(payload.toString());
+
+		const pubKeyDer = createPublicKey({
+			key: Buffer.from(x5u, "base64"),
+			type: "spki",
+			format: "der",
+		});
+		
+		this.data.sharedSecret = this.data.createSharedSecret(
+			this.data.loginData.ecdhKeyPair.privateKey,
+			pubKeyDer,
+		);
+		
+		const secretHash = createHash("sha256")
+			.update(new Uint8Array(Buffer.from(salt, "base64")))
+			.update(new Uint8Array(this.data.sharedSecret))
+			.digest();
+
+		this.secretKeyBytes = secretHash;
+		this.iv = secretHash.slice(0, 16);
+		this.startEncryption(this.iv);
+		
+		const handshake = new ClientToServerHandshakePacket();
+		this.send(handshake);
+	}
+
+	private handlePlayStatusPacket(packet: PlayStatusPacket): void {
 		if (packet.status === PlayStatus.LoginSuccess) {
 		}
-		if (packet.status === PlayStatus.PlayerSpawn) {
-			if (this.cancelPastLogin) return;
-			const init = new SetLocalPlayerAsInitializedPacket();
-			init.runtimeEntityId = this.runtimeEntityId;
-
-			const ServerBoundLoadingScreen =
-				new ServerboundLoadingScreenPacketPacket();
-			ServerBoundLoadingScreen.type =
-				ServerboundLoadingScreenType.EndLoadingScreen;
-			ServerBoundLoadingScreen.hasScreenId = false;
-			this.send(init);
-			this.send(ServerBoundLoadingScreen);
-			this.emit("SetLocalPlayerAsInitializedPacket", init);
+		
+		if (packet.status === PlayStatus.PlayerSpawn && !this.cancelPastLogin) {
+			this.completePlayerSpawn();
 		}
+	}
+
+	private completePlayerSpawn(): void {
+		const init = new SetLocalPlayerAsInitializedPacket();
+		init.runtimeEntityId = this.runtimeEntityId;
+
+		const serverBoundLoadingScreen = new ServerboundLoadingScreenPacketPacket();
+		serverBoundLoadingScreen.type = ServerboundLoadingScreenType.EndLoadingScreen;
+		serverBoundLoadingScreen.hasScreenId = false;
+		
+		this.send(init);
+		this.send(serverBoundLoadingScreen);
+		this.emit("SetLocalPlayerAsInitializedPacket", init);
 	}
 
 	private handleResourcePacksInfoPacket(
 		packet: ResourcePacksInfoPacket | ResourcePackStackPacket,
-	) {
+	): void {
 		if (this.cancelPastLogin) return;
+		
 		const response = new ResourcePackClientResponsePacket();
 		response.packs = [];
 		response.response = ResourcePackResponse.Completed;
 		this.send(response);
-		if (packet instanceof ResourcePacksInfoPacket)
+		
+		if (packet instanceof ResourcePacksInfoPacket) {
 			this.send(ClientCacheStatusPacket.create(false));
+		}
 	}
 
-	public startEncryption(iv: Buffer) {
+	public startEncryption(iv: Buffer): void {
 		this.packetEncryptor = new PacketEncryptor(this, iv);
 		this._encryptionEnabled = true;
 	}
 
-	public disconnect() {
+	public disconnect(): void {
+		if (this.status === Status.Disconnected) return;
+		
 		this.status = Status.Disconnected;
 		try {
-			this.removeAllListeners();
-			this.destroy();
-			this.raknet.disconnect();
-			this.packetEncryptor.destroy();
-			this._encryptionEnabled = false;
-			Logger.cleanup();
+			this.cleanup();
 		} catch (error) {
 			Logger.error("Error during disconnect:", error);
 		}
+	}
+
+	private cleanup(): void {
+		this.removeAllListeners();
+		this.destroy();
+		
+		if (this.raknet) {
+			this.raknet.disconnect();
+		}
+		
+		if (this.packetEncryptor) {
+			this.packetEncryptor.destroy();
+			this._encryptionEnabled = false;
+		}
+		
+		Logger.cleanup();
 	}
 
 	public sendMessage(text: string): void {
@@ -334,3 +394,4 @@ class Client extends Emitter<ClientEvents> {
 }
 
 export { Client };
+
