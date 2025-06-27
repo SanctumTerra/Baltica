@@ -2,8 +2,8 @@ import {
 	DisconnectMessage,
 	DisconnectPacket,
 	DisconnectReason,
+	type LevelChunkPacket,
 } from "@serenityjs/protocol";
-import type { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import type { Client, PacketNames } from "../client";
 import { Emitter } from "../libs";
 import type { Player } from "../server";

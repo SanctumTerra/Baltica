@@ -10,6 +10,7 @@ import {
 } from "@sanctumterra/raknet";
 
 import {
+	ClientCacheStatusPacket,
 	ClientToServerHandshakePacket,
 	DataPacket,
 	Packet,
@@ -37,15 +38,11 @@ import {
 	authenticate,
 	createOfflineSession,
 } from "../network";
-import { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
-import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import { PacketEncryptor } from "../network/packet-encryptor";
 import { ClientData } from "./client-data";
 import {
 	type ClientEvents,
 	type ClientOptions,
-	ExtraPackets,
-	type ExtraPacketType,
 	type PacketNames,
 	ProtocolList,
 	defaultClientOptions,
@@ -215,13 +212,9 @@ class Client extends Emitter<ClientEvents> {
 	/** Already decompressed packets */
 	public processPacket(buffer: Buffer): void {
 		const id = getPacketId(buffer);
-		let PacketClass = Packets[id];
+		const PacketClass = Packets[id];
 
 		try {
-			if (id in ExtraPackets) {
-				PacketClass = ExtraPackets[id as keyof typeof ExtraPackets];
-			}
-
 			if (!PacketClass || !PacketClass.name) {
 				Logger.warn(`Unknown Game packet ${id}`);
 				return;
@@ -367,7 +360,9 @@ class Client extends Emitter<ClientEvents> {
 		this.send(response);
 
 		if (packet instanceof ResourcePacksInfoPacket) {
-			this.send(ClientCacheStatusPacket.create(false));
+			const packet = new ClientCacheStatusPacket();
+			packet.enabled = false;
+			this.send(packet);
 		}
 	}
 

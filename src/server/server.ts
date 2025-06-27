@@ -89,7 +89,7 @@ export class Server extends Emitter<ServerEvents> {
 
 	public onDisconnect(player: Player) {
 		const displayName =
-			player.profile.name ?? this.getConnectionKey(player.connection);
+			player.profile?.name ?? this.getConnectionKey(player.connection);
 		Logger.info("Player disconnected: ", displayName);
 		this.emit("disconnect", displayName, player);
 		this.connections.delete(this.getConnectionKey(player.connection));

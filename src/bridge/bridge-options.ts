@@ -1,6 +1,5 @@
 import type * as Protocol from "@serenityjs/protocol";
 import type { PacketNames } from "../client";
-import type { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import {
 	type ServerOptions,
 	defaultServerOptions,
@@ -14,11 +13,6 @@ export type BridgePlayerEvents = {
 } & {
 	[K in PacketNames as `serverbound-${K}`]: [
 		packet: InstanceType<(typeof Protocol)[K]>,
-		eventStatus: { cancelled: boolean; modified: boolean },
-	];
-} & {
-	"serverbound-ClientCacheStatusPacket": [
-		packet: ClientCacheStatusPacket,
 		eventStatus: { cancelled: boolean; modified: boolean },
 	];
 };

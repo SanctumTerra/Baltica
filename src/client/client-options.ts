@@ -1,24 +1,15 @@
 import { CompressionMethod, DataPacket, InputMode } from "@serenityjs/protocol";
 import type * as Protocol from "@serenityjs/protocol";
-import type { ClientCacheStatusPacket } from "../network/packets/client-cache-status";
 import type { Advertisement } from "@sanctumterra/raknet";
-import {
-	AddPaintingPacket,
-	UpdateSubchunkBlocksPacket,
-	MotionPredictHintsPacket,
-	SetLastHurtByPacket,
-	SetDefaultGamemodePacket,
-	UpdatePlayerGameTypePacket,
-	UpdateBlockSyncPacket,
-} from "../network/packets";
-import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import type { SkinData } from "./types/payload";
+import { ClientCacheStatusPacket } from "@serenityjs/protocol";
 
 export enum ProtocolList {
 	"1.21.50" = 766,
 	"1.21.60" = 776,
 	"1.21.70" = 786,
 	"1.21.80" = 800,
+	"1.21.90" = 818,
 }
 
 export enum DeviceOS {
@@ -38,6 +29,32 @@ export enum DeviceOS {
 	Xbox = 13,
 	WindowsPhone = 14,
 	Linux = 15,
+}
+
+/**
+ * Checks if client version is higher than the specified version
+ * @param clientVersion The client version to check
+ * @param targetVersion The version to compare against
+ * @returns True if client version is higher than targetVersion
+ */
+export function versionHigherThan(
+	clientVersion: keyof typeof ProtocolList,
+	targetVersion: keyof typeof ProtocolList,
+): boolean {
+	return ProtocolList[clientVersion] > ProtocolList[targetVersion];
+}
+
+/**
+ * Checks if client version is lower than the specified version
+ * @param clientVersion The client version to check
+ * @param targetVersion The version to compare against
+ * @returns True if client version is lower than targetVersion
+ */
+export function versionLowerThan(
+	clientVersion: keyof typeof ProtocolList,
+	targetVersion: keyof typeof ProtocolList,
+): boolean {
+	return ProtocolList[clientVersion] < ProtocolList[targetVersion];
 }
 
 type LoginPacketOptions = {
@@ -75,7 +92,7 @@ const defaultClientOptions: ClientOptions = {
 	compressionMethod: CompressionMethod.Zlib,
 	compressionLevel: 7,
 	deviceOS: DeviceOS.NintendoSwitch,
-	version: "1.21.80",
+	version: "1.21.90",
 	username: "SanctumTerra",
 	tokensFolder: "tokens",
 	viewDistance: 10,
@@ -83,7 +100,7 @@ const defaultClientOptions: ClientOptions = {
 	offline: false,
 	worker: false,
 	loginOptions: {
-		DeviceModel: "Beans something something",
+		DeviceModel: "Bean Bag Chair",
 		CurrentInputMode: InputMode.GamePad,
 		DefaultInputMode: InputMode.GamePad,
 	},
@@ -108,23 +125,6 @@ type ClientEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];
 } & {
 	session: [];
-	ClientCacheStatusPacket: [
-		packet: InstanceType<typeof ClientCacheStatusPacket>,
-	];
-	UpdateSubchunkBlocksPacket: [
-		packet: InstanceType<typeof UpdateSubchunkBlocksPacket>,
-	];
-	MotionPredictHintsPacket: [
-		packet: InstanceType<typeof MotionPredictHintsPacket>,
-	];
-	SetLastHurtByPacket: [packet: InstanceType<typeof SetLastHurtByPacket>];
-	SetDefaultGamemodePacket: [
-		packet: InstanceType<typeof SetDefaultGamemodePacket>,
-	];
-	UpdatePlayerGameTypePacket: [
-		packet: InstanceType<typeof UpdatePlayerGameTypePacket>,
-	];
-	UpdateBlockSyncPacket: [packet: InstanceType<typeof UpdateBlockSyncPacket>];
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
 	connect: [packet: Advertisement];
@@ -135,25 +135,4 @@ export {
 	defaultClientOptions,
 	type ClientEvents,
 	type PacketNames,
-};
-
-export type ExtraPacketType =
-	| typeof LevelChunkPacket
-	| typeof AddPaintingPacket
-	| typeof UpdateSubchunkBlocksPacket
-	| typeof MotionPredictHintsPacket
-	| typeof SetLastHurtByPacket
-	| typeof SetDefaultGamemodePacket
-	| typeof UpdatePlayerGameTypePacket
-	| typeof UpdateBlockSyncPacket;
-
-export const ExtraPackets: Record<number, ExtraPacketType> = {
-	[58]: LevelChunkPacket,
-	[22]: AddPaintingPacket,
-	[172]: UpdateSubchunkBlocksPacket,
-	[157]: MotionPredictHintsPacket,
-	[96]: SetLastHurtByPacket,
-	[105]: SetDefaultGamemodePacket,
-	[151]: UpdatePlayerGameTypePacket,
-	[110]: UpdateBlockSyncPacket,
 };

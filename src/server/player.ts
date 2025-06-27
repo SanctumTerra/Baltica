@@ -119,7 +119,11 @@ class Player extends Emitter<PlayerEvents> {
 		});
 
 		this.once("LoginPacket", async (packet) => {
-			const { key, data, skin } = await decodeLoginJWT(packet.tokens);
+			try {
+			const { key, data, skin } = await decodeLoginJWT(
+				packet.tokens,
+				this.server.options.version,
+			);
 			const extraData = (data as { extraData: object }).extraData as {
 				displayName: string;
 				identity: string;
@@ -179,6 +183,10 @@ class Player extends Emitter<PlayerEvents> {
 
 			this.emit("login");
 			Logger.debug(`Enabling Encryption for ${this.profile.name}`);
+			} catch (error) {
+				Logger.error(`Error decoding login JWT: ${error}`);
+				this.sendDisconnectMessage("Version mismatch, please update your client!");
+			}
 		});
 
 		this.once("ClientToServerHandshakePacket", () => {
@@ -191,6 +199,14 @@ class Player extends Emitter<PlayerEvents> {
 			this.packetEncryptor = new PacketEncryptor(this, iv);
 			this._encryptionEnabled = true;
 		}
+	}
+
+	public sendDisconnectMessage(message: string){
+		const disconnect = new DisconnectPacket();
+		disconnect.hideDisconnectScreen = false;
+		disconnect.message = new DisconnectMessage(message, message);
+		disconnect.reason = DisconnectReason.VersionMismatch;
+		this.sendPacket(disconnect, Priority.Immediate);
 	}
 
 	public sendPacket(

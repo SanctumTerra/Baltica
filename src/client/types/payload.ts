@@ -52,7 +52,6 @@ export type Payload = {
 	SkinImageWidth: number;
 	SkinResourcePatch: string;
 	ThirdPartyName: string;
-	ThirdPartyNameOnly: boolean;
 	TrustedSkin: boolean;
 	UIProfile: number;
 	GraphicsMode: number;
@@ -127,7 +126,6 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		SkinImageWidth: skin.skinData.SkinImageWidth,
 		SkinResourcePatch: skin.skinData.SkinResourcePatch,
 		ThirdPartyName: username,
-		ThirdPartyNameOnly: false,
 		TrustedSkin: skin.skinData.TrustedSkin,
 		UIProfile: client.options.uiProfile,
 		GraphicsMode: client.options.graphicsMode,

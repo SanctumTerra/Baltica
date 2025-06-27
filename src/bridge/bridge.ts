@@ -10,7 +10,6 @@ import {
 import * as Protocol from "@serenityjs/protocol";
 import { Client, DeviceOS, SkinData, type PacketNames } from "../client";
 import type { ForceArray } from "../libs";
-import { LevelChunkPacket } from "../network/packets/level-chunk-packet";
 import { type Player, Server, type ServerEvents } from "../server";
 import {
 	type BridgeOptions,
@@ -56,11 +55,13 @@ export class Bridge extends Server {
 			ClientCacheStatusPacket as unknown as PacketConstructor,
 		);
 
-		const levelChunkId = (LevelChunkPacket as unknown as { id: number }).id;
+		const levelChunkId = (
+			Protocol.LevelChunkPacket as unknown as { id: number }
+		).id;
 		if (levelChunkId !== undefined) {
 			this.packetClassCache.set(
 				levelChunkId,
-				LevelChunkPacket as unknown as PacketConstructor,
+				Protocol.LevelChunkPacket as unknown as PacketConstructor,
 			);
 		}
 	}
@@ -108,7 +109,9 @@ export class Bridge extends Server {
 		if (packetName === "LevelChunkPacket" && !player.postStartGame) {
 			try {
 				player.levelChunkQueue.push(
-					new LevelChunkPacket(buffer).deserialize() as LevelChunkPacket,
+					new Protocol.LevelChunkPacket(
+						buffer,
+					).deserialize() as Protocol.LevelChunkPacket,
 				);
 			} catch (e) {
 				Logger.error("Failed to deserialize LevelChunkPacket for queueing", e);
@@ -255,8 +258,8 @@ export class Bridge extends Server {
 				const frame = new Frame();
 				frame.orderChannel = 0;
 				frame.payload = rakDisconnect.serialize();
-				player.client.raknet.sendFrame(frame, Priority.Immediate);
-				player.client.send(disconnect);
+				player.client?.raknet?.sendFrame(frame, Priority.Immediate);
+				player.client?.send(disconnect);
 			}
 		});
 	}
@@ -286,7 +289,7 @@ export class Bridge extends Server {
 		console.log("Creating Client");
 
 		const payload = player.player.data.payload;
-
+		console.log(this.options)
 		const client = new Client({
 			host: this.options.destination.host,
 			port: this.options.destination.port,

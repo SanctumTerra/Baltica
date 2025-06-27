@@ -6,6 +6,8 @@ import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
 import { Bedrock } from "./beta/auth";
+import { versionHigherThan } from "src/client";
+import type { Version } from "src/server";
 
 export interface Profile {
 	name: string;
@@ -214,6 +216,7 @@ const getDER = (b64: string) => {
 };
 
 const readAuth = async (chain: string[]) => {
+	console.log(chain)
 	let authData = {};
 	let pubKey = getDER(getX5U(chain[0]));
 	let key: string | null = null;
@@ -262,11 +265,24 @@ const readSkin = async (publicKey: string, token: string) => {
 	return payload;
 };
 
-const decodeLoginJWT = async (tokens: LoginTokens) => {
+const decodeLoginJWT = async (tokens: LoginTokens, version: Version) => {
 	const identity = tokens.identity;
 	const client = tokens.client;
 	const payload = JSON.parse(identity);
-	const ClientUserChain = payload.chain;
+	let ClientUserChain = [];
+	console.log(payload)
+
+	if (versionHigherThan(version, "1.21.80")) {
+		const parsed = JSON.parse(payload.Certificate);
+		ClientUserChain = parsed.chain;
+	} else {
+		ClientUserChain = payload.chain;
+	}
+	if (!ClientUserChain) {
+		throw new Error("No client user chain found, possible version mismatch!");
+	}
+	console.log(ClientUserChain);
+	// const ClientUserChain = payload.chain;
 
 	const auth = await readAuth(ClientUserChain);
 	const skin = await readSkin(auth.key, tokens.client);

@@ -3,10 +3,16 @@ import type { Client } from "./client";
 import { v3 as uuidv3 } from "uuid-1345";
 import { type Payload, createDefaultPayload } from "./types/payload";
 import * as jose from "jose";
-import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
+import {
+	Certificate,
+	createECDH,
+	KeyObject,
+	type KeyExportOptions,
+} from "node:crypto";
 import { type LoginData, prepareLoginData } from "./types/login-data";
 import { Logger } from "@sanctumterra/raknet";
 import type { Player } from "../server/player";
+import { versionHigherThan } from "./client-options";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -36,7 +42,17 @@ class ClientData {
 		const loginPacket = new LoginPacket();
 		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
 		const userChain = this.loginData.clientUserChain;
-		const encodedChain = JSON.stringify({ chain });
+		let encodedChain = "";
+		if (versionHigherThan(this.client.options.version, "1.21.80")) {
+			const certificate = JSON.stringify({ chain });
+			encodedChain = JSON.stringify({
+				AuthenticationType: 2,
+				Certificate: certificate,
+				Token: "",
+			});
+		} else {
+			encodedChain = JSON.stringify({ chain });
+		}
 		loginPacket.protocol = this.client.protocol;
 		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
 		return loginPacket;
