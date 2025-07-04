@@ -11,8 +11,6 @@ import { Logger } from "@sanctumterra/raknet";
 import { Client, createDefaultPayload, Payload } from "../";
 import { CurrentVersionConst, ProtocolList, versionHigherThan } from "src/types";
 import { LoginData, prepareLoginData } from "./login-data";
-import { createDecoder } from "node_modules/fast-jwt/src";
-// import type { Player } from "../server/player";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
