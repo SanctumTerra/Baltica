@@ -28,7 +28,6 @@
 		"@serenityjs/protocol": "latest",
 		"axios": "^1.10.0",
 		"elliptic": "^6.6.1",
-		"fast-jwt": "^6.0.2",
 		"jose": "^5.10.0",
 		"prismarine-auth": "^2.7.0",
 		"uuid-1345": "^1.0.2"
