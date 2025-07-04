@@ -1,7 +1,7 @@
-import type { Player } from "../../server/player";
-import type { Client } from "../client";
-import { ClientData } from "../client-data";
-import { DeviceOS } from "../client-options";
+import { CurrentVersionConst, DeviceOS } from "src/types";
+import type { Client } from "../";
+import { ClientData } from "./client-data";
+
 import type {
 	AnimatedImageData,
 	PersonaPieces,
@@ -81,7 +81,7 @@ export type SkinData = {
 	TrustedSkin: boolean;
 };
 
-export const createDefaultPayload = (client: Client | Player): Payload => {
+export const createDefaultPayload = (client: Client): Payload => {
 	const username = client.profile?.name ?? client.options.username;
 	const payload = {
 		AnimatedImageData: skin.skinData.AnimatedImageData as AnimatedImageData[],
@@ -93,29 +93,29 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		CapeOnClassicSkin: skin.skinData.CapeOnClassicSkin,
 		ClientRandomId: ClientData.generateId(),
 		CompatibleWithClientSideChunkGen: false,
-		CurrentInputMode: client.options.loginOptions.CurrentInputMode,
-		DefaultInputMode: client.options.loginOptions.DefaultInputMode,
+		CurrentInputMode: client.options.loginOptions.currentInputMode,
+		DefaultInputMode: client.options.loginOptions.defaultInputMode,
 		DeviceId: ClientData.nextUUID(username),
-		DeviceModel: client.options.loginOptions.DeviceModel,
-		DeviceOS: client.options.deviceOS ?? DeviceOS.NintendoSwitch,
-		GameVersion: client.options?.version,
+		DeviceModel: client.options.loginOptions.deviceModel,
+		DeviceOS: client.options.loginOptions.deviceOS ?? DeviceOS.NintendoSwitch,
+		GameVersion: CurrentVersionConst,
 		GuiScale: 0,
 		IsEditorMode: false,
 		LanguageCode: "en_US",
-		MaxViewDistance: client.options?.viewDistance,
-		MemoryTier: client.options.memoryTier,
+		MaxViewDistance: client.options.viewDistance,
+		MemoryTier: client.options.loginOptions.memoryTier,
 		OverrideSkin: false,
 		PersonaPieces: skin.skinData.PersonaPieces,
 		PersonaSkin: skin.skinData.PersonaSkin,
 		PieceTintColors: skin.skinData.PieceTintColors,
 		PlatformOfflineId: ClientData.nextUUID(username).replace(/-/g, ""),
 		PlatformOnlineId: ClientData.OnlineId(),
-		PlatformType: client.options.platformType,
+		PlatformType: client.options.loginOptions.platformType,
 		// PlatformUserId: "",
 		PlayFabId: ClientData.nextUUID(username).replace(/-/g, "").slice(0, 16),
 		PremiumSkin: skin.skinData.PremiumSkin,
 		SelfSignedId: ClientData.nextUUID(username),
-		ServerAddress: `${client.options.host}:${client.options.port}`,
+		ServerAddress: `${client.options.address}:${client.options.port}`,
 		SkinAnimationData: skin.skinData.SkinAnimationData,
 		SkinColor: skin.skinData.SkinColor,
 		SkinData: skin.skinData.SkinData,
@@ -127,8 +127,8 @@ export const createDefaultPayload = (client: Client | Player): Payload => {
 		SkinResourcePatch: skin.skinData.SkinResourcePatch,
 		ThirdPartyName: username,
 		TrustedSkin: skin.skinData.TrustedSkin,
-		UIProfile: client.options.uiProfile,
-		GraphicsMode: client.options.graphicsMode,
+		UIProfile: client.options.loginOptions.uiProfile,
+		GraphicsMode: client.options.loginOptions.graphicsMode,
 	};
 	return payload;
 };

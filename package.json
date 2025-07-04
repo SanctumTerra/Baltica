@@ -28,6 +28,7 @@
 		"@serenityjs/protocol": "latest",
 		"axios": "^1.10.0",
 		"elliptic": "^6.6.1",
+		"fast-jwt": "^6.0.2",
 		"jose": "^5.10.0",
 		"prismarine-auth": "^2.7.0",
 		"uuid-1345": "^1.0.2"
@@ -35,7 +36,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
 		"@types/elliptic": "^6.4.18",
-		"@types/node": "^22.15.33",
+		"@types/node": "^22.16.0",
 		"@types/uuid-1345": "^0.99.25",
 		"typescript": "^5.8.3"
 	}

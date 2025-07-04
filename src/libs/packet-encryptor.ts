@@ -2,7 +2,6 @@ import * as crypto from "node:crypto";
 import * as Zlib from "node:zlib";
 import { CompressionMethod } from "@serenityjs/protocol";
 import type { Client } from "../client/client";
-import type { Player } from "../server/player";
 
 class PacketEncryptor {
 	static instance: PacketEncryptor;
@@ -13,9 +12,9 @@ class PacketEncryptor {
 	public receiveCounter: bigint;
 	public cipher: crypto.CipherGCM | null;
 	public decipher: crypto.DecipherGCM | null;
-	public client: Client | Player;
+	public client: Client;
 
-	constructor(client: Client | Player, iv: Buffer) {
+	constructor(client: Client, iv: Buffer) {
 		this.secretKeyBytes = new Uint8Array(client.secretKeyBytes);
 		this.compressionThreshold = client.options.compressionThreshold;
 		this.sendCounter = 0n;

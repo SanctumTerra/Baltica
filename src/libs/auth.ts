@@ -5,9 +5,7 @@ import * as jose from "jose";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
-import { Bedrock } from "./beta/auth";
-import { versionHigherThan } from "src/client";
-import type { Version } from "src/server";
+import { ProtocolList, versionHigherThan } from "../";
 
 export interface Profile {
 	name: string;
@@ -45,44 +43,6 @@ async function createOfflineSession(client: Client): Promise<void> {
 async function authenticate(client: Client): Promise<void> {
 	const startTime = Date.now();
 	try {
-		if (client.options.betaAuth) {
-			if (!process.argv.includes("betaAuth"))
-				throw new Error("Beta authentication is in beta, please do not use.");
-			Logger.info("Using Bedrock Auth");
-			const bedrock = new Bedrock(
-				client.options.version,
-				true,
-				client.data.loginData.clientX509,
-			);
-			try {
-				const success = await bedrock.auth();
-				if (!success) {
-					throw new Error("Beta authentication failed");
-				}
-			} catch (error) {
-				Logger.error(
-					`Beta authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-				);
-				throw error;
-			}
-			const chains = bedrock.getChainData();
-			if (!chains || chains.length < 2) {
-				throw new Error("Invalid chain data received");
-			}
-			Logger.debug("Chain data received:", chains);
-			const endTime = Date.now();
-			Logger.info(
-				`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
-			);
-
-			const profile = extractProfile(chains[1]);
-
-			await setupClientProfile(client, profile, chains);
-			await setupClientChains(client);
-			client.emit("session");
-			return;
-		}
-		// Logger.info("Using PrismarineJS Auth");
 		const authflow = createAuthflow(client);
 		const chains = await getMinecraftBedrockToken(authflow, client);
 		const profile = extractProfile(chains[1]);
@@ -92,9 +52,10 @@ async function authenticate(client: Client): Promise<void> {
 		);
 
 		await setupClientProfile(client, profile, chains);
-		await setupClientChains(client);
+		setupClientChains(client).then((value) => {
+            client.emit("session");
+        });
 
-		client.emit("session");
 	} catch (error) {
 		Logger.error(
 			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -188,15 +149,8 @@ async function setupClientChains(
 	client: Client,
 	offline = false,
 ): Promise<void> {
-	const [clientIdentityChain, clientUserChain] = await Promise.all([
-		client.data.createClientChain(null, offline),
-		client.data.createClientUserChain(
-			client.data.loginData.ecdhKeyPair.privateKey,
-		),
-	]);
-
-	client.data.loginData.clientIdentityChain = clientIdentityChain;
-	client.data.loginData.clientUserChain = clientUserChain;
+	client.data.loginData.clientIdentityChain = await client.data.createClientChain(null, offline);
+	client.data.loginData.clientUserChain = await client.data.createClientUserChain(client.data.loginData.ecdhKeyPair.privateKey);
 }
 
 function getX5U(token: string) {
@@ -265,7 +219,7 @@ const readSkin = async (publicKey: string, token: string) => {
 	return payload;
 };
 
-const decodeLoginJWT = async (tokens: LoginTokens, version: Version) => {
+const decodeLoginJWT = async (tokens: LoginTokens, version: keyof typeof ProtocolList) => {
 	const identity = tokens.identity;
 	const client = tokens.client;
 	const payload = JSON.parse(identity);

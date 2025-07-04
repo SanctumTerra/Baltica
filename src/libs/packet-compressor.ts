@@ -1,11 +1,10 @@
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { CompressionMethod, Framer } from "@serenityjs/protocol";
-import type { Player } from "src/server/player";
 import type { Client } from "../client/client";
 
 class PacketCompressor {
-	private client: Client | Player;
-	constructor(client: Client | Player) {
+	private client: Client;
+	constructor(client: Client) {
 		this.client = client;
 	}
 
