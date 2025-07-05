@@ -25,7 +25,7 @@
 		"@sanctumterra/raknet": "^1.3.78",
 		"@serenityjs/binarystream": "^2.7.1",
 		"@serenityjs/core": "^0.8.5",
-		"@serenityjs/protocol": "latest",
+		"@serenityjs/protocol": "0.8.6-beta-20250704151230",
 		"axios": "^1.10.0",
 		"elliptic": "^6.6.1",
 		"jose": "^5.10.0",
