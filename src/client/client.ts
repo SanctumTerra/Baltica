@@ -159,7 +159,7 @@ export class Client extends Emitter<ClientEvents> {
 			    format: "der",
 		    });
 
-    		this.data.sharedSecret = this.data.createSharedSecret(
+    		this.data.sharedSecret = ClientData.createSharedSecret(
 	    		this.data.loginData.ecdhKeyPair.privateKey,
 		    	pubKeyDer,
 		    );
