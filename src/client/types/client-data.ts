@@ -2,7 +2,6 @@ import { IdentityData, LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import { v3 as uuidv3 } from "uuid-1345";
 import * as jose from "jose";
 import {
-	Certificate,
 	createECDH,
 	KeyObject,
 	type KeyExportOptions,
@@ -132,11 +131,11 @@ class ClientData {
 			.sign(josePrivateKey);
 	}
 
-	public createSharedSecret(
+	public static createSharedSecret(
 		privateKey: KeyObject,
 		publicKey: KeyObject,
 	): Buffer {
-		this.validateKeys(privateKey, publicKey);
+		ClientData.validateKeys(privateKey, publicKey);
 
 		const curve = privateKey.asymmetricKeyDetails?.namedCurve;
 		if (!curve) {
@@ -178,7 +177,7 @@ class ClientData {
 		}
 	}
 
-	private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
+	static validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
 		if (
 			!(privateKey instanceof KeyObject) ||
 			!(publicKey instanceof KeyObject)
