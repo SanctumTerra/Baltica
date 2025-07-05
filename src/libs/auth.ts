@@ -170,7 +170,6 @@ const getDER = (b64: string) => {
 };
 
 const readAuth = async (chain: string[]) => {
-	console.log(chain)
 	let authData = {};
 	let pubKey = getDER(getX5U(chain[0]));
 	let key: string | null = null;
@@ -224,7 +223,6 @@ const decodeLoginJWT = async (tokens: LoginTokens, version: keyof typeof Protoco
 	const client = tokens.client;
 	const payload = JSON.parse(identity);
 	let ClientUserChain = [];
-	console.log(payload)
 
 	if (versionHigherThan(version, "1.21.80")) {
 		const parsed = JSON.parse(payload.Certificate);
@@ -235,7 +233,6 @@ const decodeLoginJWT = async (tokens: LoginTokens, version: keyof typeof Protoco
 	if (!ClientUserChain) {
 		throw new Error("No client user chain found, possible version mismatch!");
 	}
-	console.log(ClientUserChain);
 	// const ClientUserChain = payload.chain;
 
 	const auth = await readAuth(ClientUserChain);
