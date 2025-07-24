@@ -1,13 +1,6 @@
 import type * as Protocol from "@serenityjs/protocol";
-import { Advertisement } from "@sanctumterra/raknet";
-
-type PacketNames = {
-	[K in keyof typeof Protocol]: K extends `${string}Packet`
-		? K extends "Packet" | "DataPacket"
-			? never
-			: K
-		: never;
-}[keyof typeof Protocol];
+import type { Advertisement } from "@sanctumterra/raknet";
+import type { PacketNames } from "src/types";
 
 type ClientEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];
@@ -18,7 +11,4 @@ type ClientEvents = {
 	connect: [packet: Advertisement];
 };
 
-export {
-	type ClientEvents,
-	type PacketNames,
-};
+export type { ClientEvents, PacketNames };

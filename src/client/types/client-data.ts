@@ -1,15 +1,15 @@
 import { IdentityData, LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import { v3 as uuidv3 } from "uuid-1345";
 import * as jose from "jose";
-import {
-	createECDH,
-	KeyObject,
-	type KeyExportOptions,
-} from "node:crypto";
+import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
-import { Client, createDefaultPayload, Payload } from "../";
-import { CurrentVersionConst, ProtocolList, versionHigherThan } from "src/types";
-import { LoginData, prepareLoginData } from "./login-data";
+import { type Client, createDefaultPayload, type Payload } from "../";
+import {
+	CurrentVersionConst,
+	ProtocolList,
+	versionHigherThan,
+} from "src/types";
+import { type LoginData, prepareLoginData } from "./login-data";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -19,7 +19,7 @@ const pem: KeyExportOptions<"pem"> = { format: "pem", type: "sec1" };
 const der: KeyExportOptions<"der"> = { format: "der", type: "spki" };
 
 class ClientData {
-	public client: Client // | Player;
+	public client: Client; // | Player;
 	/** This Contains a lot of Data for the Login Packet */
 	public payload: Payload;
 	/** This Contains the Access Tokens from Auth */
@@ -28,8 +28,8 @@ class ClientData {
 	public loginData: LoginData;
 	/** This Contains the Shared Secret */
 	public sharedSecret!: Buffer;
-    /** This tells the jwt to use legacy auth */
-    public legacy: boolean = true;
+	/** This tells the jwt to use legacy auth */
+	public legacy = true;
 
 	constructor(client: Client) {
 		this.client = client;
@@ -37,24 +37,24 @@ class ClientData {
 		this.loginData = prepareLoginData();
 	}
 
-    public createLoginPacket(): LoginPacket {
-        const loginPacket = new LoginPacket();
-        const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
-        const userChain = this.loginData.clientUserChain;
-        const certificate = JSON.stringify({ chain });
-        
-        const encodedChain = JSON.stringify({
-            AuthenticationType: this.client.options.offline ? 2 : 0,
-            Certificate: certificate,
-            Token: "",
-        });
-        
-        loginPacket.protocol = ProtocolList[CurrentVersionConst];
-        loginPacket.tokens = new LoginTokens(userChain, encodedChain);
-        return loginPacket;
-    }
+	public createLoginPacket(): LoginPacket {
+		const loginPacket = new LoginPacket();
+		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
+		const userChain = this.loginData.clientUserChain;
+		const certificate = JSON.stringify({ chain });
 
-    public async createClientChain(
+		const encodedChain = JSON.stringify({
+			AuthenticationType: this.client.options.offline ? 2 : 0,
+			Certificate: certificate,
+			Token: "",
+		});
+
+		loginPacket.protocol = ProtocolList[CurrentVersionConst];
+		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
+		return loginPacket;
+	}
+
+	public async createClientChain(
 		mojangKey: string | null,
 		offline: boolean,
 	): Promise<string> {
@@ -69,7 +69,7 @@ class ClientData {
 				iat: Math.floor(Date.now() / 1000),
 				exp: Math.floor(Date.now() / 1000) + 3600,
 				extraData: {
-					displayName:  this.client.profile.name,
+					displayName: this.client.profile.name,
 					identity: this.client.profile.uuid,
 					titleId: "89692877",
 					XUID: "",

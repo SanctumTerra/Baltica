@@ -1,3 +1,3 @@
 export * from "./server";
-export * from "./types"
-export * from "./player"
+export * from "./types";
+export * from "./player";

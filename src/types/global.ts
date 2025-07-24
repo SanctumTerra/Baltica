@@ -1,10 +1,12 @@
+import type * as Protocol from "@serenityjs/protocol";
+
 export enum ProtocolList {
 	"1.21.50" = 766,
 	"1.21.60" = 776,
 	"1.21.70" = 786,
 	"1.21.80" = 800,
 	"1.21.90" = 818,
-    "1.21.93" = 819
+	"1.21.93" = 819,
 }
 
 export enum DeviceOS {
@@ -26,12 +28,19 @@ export enum DeviceOS {
 	Linux = 15,
 }
 
+export type PacketNames = {
+	[K in keyof typeof Protocol]: K extends `${string}Packet`
+		? K extends "Packet" | "DataPacket"
+			? never
+			: K
+		: never;
+}[keyof typeof Protocol];
+
 /**
  * We do not have multi protocol as of now (Not yet planned either).
  */
 export type CurrentVersion = "1.21.93";
 export const CurrentVersionConst: CurrentVersion = "1.21.93";
-
 
 /**
  * Checks if client version is higher than the specified version

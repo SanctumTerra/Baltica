@@ -5,7 +5,7 @@ import * as jose from "jose";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
-import { ProtocolList, versionHigherThan } from "../";
+import { type ProtocolList, versionHigherThan } from "../";
 
 export interface Profile {
 	name: string;
@@ -53,9 +53,8 @@ async function authenticate(client: Client): Promise<void> {
 
 		await setupClientProfile(client, profile, chains);
 		setupClientChains(client).then((value) => {
-            client.emit("session");
-        });
-
+			client.emit("session");
+		});
 	} catch (error) {
 		Logger.error(
 			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -149,8 +148,12 @@ async function setupClientChains(
 	client: Client,
 	offline = false,
 ): Promise<void> {
-	client.data.loginData.clientIdentityChain = await client.data.createClientChain(null, offline);
-	client.data.loginData.clientUserChain = await client.data.createClientUserChain(client.data.loginData.ecdhKeyPair.privateKey);
+	client.data.loginData.clientIdentityChain =
+		await client.data.createClientChain(null, offline);
+	client.data.loginData.clientUserChain =
+		await client.data.createClientUserChain(
+			client.data.loginData.ecdhKeyPair.privateKey,
+		);
 }
 
 function getX5U(token: string) {
@@ -218,7 +221,10 @@ const readSkin = async (publicKey: string, token: string) => {
 	return payload;
 };
 
-const decodeLoginJWT = async (tokens: LoginTokens, version: keyof typeof ProtocolList) => {
+const decodeLoginJWT = async (
+	tokens: LoginTokens,
+	version: keyof typeof ProtocolList,
+) => {
 	const identity = tokens.identity;
 	const client = tokens.client;
 	const payload = JSON.parse(identity);
