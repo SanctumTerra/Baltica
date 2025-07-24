@@ -9,15 +9,19 @@ export type BridgeEventSignal = {
 };
 
 export type BridgePlayerEvents = {
-	[K in PacketNames as `clientBound-${K}`]: [signal: {
-		packet: InstanceType<(typeof Protocol)[K]>;
-		cancelled: boolean;
-		modified: boolean;
-	}];
+	[K in PacketNames as `clientBound-${K}`]: [
+		signal: {
+			packet: InstanceType<(typeof Protocol)[K]>;
+			cancelled: boolean;
+			modified: boolean;
+		},
+	];
 } & {
-	[K in PacketNames as `serverBound-${K}`]: [signal: {
-		packet: InstanceType<(typeof Protocol)[K]>;
-		cancelled: boolean;
-		modified: boolean;
-	}];
+	[K in PacketNames as `serverBound-${K}`]: [
+		signal: {
+			packet: InstanceType<(typeof Protocol)[K]>;
+			cancelled: boolean;
+			modified: boolean;
+		},
+	];
 };
