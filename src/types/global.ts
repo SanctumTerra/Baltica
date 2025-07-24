@@ -29,8 +29,8 @@ export enum DeviceOS {
 /**
  * We do not have multi protocol as of now (Not yet planned either).
  */
-export type CurrentVersion = "1.21.90";
-export const CurrentVersionConst: CurrentVersion = "1.21.90";
+export type CurrentVersion = "1.21.93";
+export const CurrentVersionConst: CurrentVersion = "1.21.93";
 
 
 /**

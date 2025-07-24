@@ -183,3 +183,4 @@ tokens/backup.ts
 src/tools/
 tests/
 chunks/
+ChunkTest.ts

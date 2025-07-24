@@ -1,8 +1,8 @@
 {
 	"name": "baltica",
 	"description": "A MCBE Utility Library",
-	"version": "0.0.12",
-	"minecraft": "1.21.90",
+	"version": "0.0.13",
+	"minecraft": "1.21.93",
 	"type": "commonjs",
 	"main": "dist/index.js",
 	"license": "MIT",
@@ -23,13 +23,14 @@
 	],
 	"dependencies": {
 		"@sanctumterra/raknet": "^1.3.78",
-		"@serenityjs/binarystream": "^2.7.1",
-		"@serenityjs/core": "^0.8.5",
-		"@serenityjs/protocol": "0.8.6-beta-20250704151230",
+		"@serenityjs/binarystream": "^2.7.3",
+		"@serenityjs/core": "^0.8.6-beta-20250704151230",
+		"@serenityjs/protocol": "^0.8.6-beta-20250704151230",
 		"axios": "^1.10.0",
 		"elliptic": "^6.6.1",
 		"jose": "^5.10.0",
 		"prismarine-auth": "^2.7.0",
+		"prismarine-chunk": "^1.38.1",
 		"uuid-1345": "^1.0.2"
 	},
 	"devDependencies": {
