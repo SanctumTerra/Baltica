@@ -1,197 +1,146 @@
-import { createHash, createPublicKey, diffieHellman } from "node:crypto";
 import {
+	type Connection,
 	Frame,
 	Logger,
 	Priority,
-	Connection as RakConnection,
 	Status,
 } from "@sanctumterra/raknet";
+import type { Server } from "./server";
 import {
-	ClientCacheStatusPacket,
-	CompressionMethod,
-	DataPacket,
-	DisconnectMessage,
-	DisconnectPacket,
-	DisconnectReason,
-	NetworkSettingsPacket,
-	Packets,
-	PlayStatus,
-	PlayStatusPacket,
-	ResourcePackStackPacket,
-	ResourcePacksInfoPacket,
-	ServerToClientHandshakePacket,
-	getPacketId,
-} from "@serenityjs/protocol";
+	decodeLoginJWT,
+	Emitter,
+	PacketCompressor,
+	PacketEncryptor,
+} from "../libs";
 import {
 	type ClientOptions,
-	type PacketNames,
-	ProtocolList,
 	defaultClientOptions,
+	type PacketNames,
+	type Payload,
+	ClientData,
+	type LoginData,
+	prepareLoginData,
 } from "../client";
-import { ClientData } from "../client/client-data";
-import type { Payload } from "../client/types";
-import { Emitter } from "../libs";
-import { PacketCompressor, type Profile, decodeLoginJWT } from "../network";
-import { PacketEncryptor } from "../network/packet-encryptor";
-import type { Server } from "./server";
-import type { PlayerEvents } from "./server-options";
+import {
+	DataPacket,
+	getPacketId,
+	NetworkSettingsPacket,
+	Packets,
+	PacketViolationWarningPacket,
+	PlayStatus,
+	PlayStatusPacket,
+	ServerToClientHandshakePacket,
+} from "@serenityjs/protocol";
+import type { PlayerEvents } from "./types";
+import { CurrentVersionConst } from "../types";
+import { createHash, createPublicKey } from "node:crypto";
 import * as jose from "jose";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);
-const PLAY_STATUS_LOGIN_SUCCESS = new PlayStatusPacket();
-PLAY_STATUS_LOGIN_SUCCESS.status = PlayStatus.LoginSuccess;
-const PLAY_STATUS_LOGIN_SUCCESS_BUFFER = PLAY_STATUS_LOGIN_SUCCESS.serialize();
 
-class Player extends Emitter<PlayerEvents> {
-	private static readonly PACKET_CACHE_STATUS_ID = 0x81;
-	private static readonly DEFAULT_NETWORK_SETTINGS = (() => {
-		const settings = new NetworkSettingsPacket();
-		settings.clientScalar = 0;
-		settings.clientThrottle = false;
-		settings.clientThreshold = 0;
-		return settings;
-	})();
+export class Player extends Emitter<PlayerEvents> {
+	packetCompressor!: PacketCompressor;
+	packetEncryptor!: PacketEncryptor;
+	_compressionEnabled: boolean;
+	_encryptionEnabled: boolean;
+	iv!: Buffer;
+	secretKeyBytes!: Buffer;
+	status: Status = Status.Disconnected;
+	loginData!: LoginData;
+	sharedSecret!: Buffer;
 
-	public server: Server;
-	public data: ClientData;
-	public profile!: Profile;
-	public options: ClientOptions;
-	public connection: RakConnection;
-	public iv!: Buffer;
-	public secretKeyBytes!: Buffer;
-	public packetCompressor: PacketCompressor;
-	public packetEncryptor!: PacketEncryptor;
-	public protocol: number;
-	public _encryptionEnabled = false;
-	public _compressionEnabled = false;
-	private preSerializedPackets = new Map<unknown, Buffer>();
-	public status: Status = Status.Disconnected;
+	server: Server;
+	connection: Connection;
+	options: ClientOptions;
+	username!: string;
+	xuid!: string;
+	loginPayload!: Payload;
 
-	constructor(server: Server, connection: RakConnection) {
+	constructor(server: Server, connection: Connection) {
 		super();
-		this.options = defaultClientOptions;
-		this.server = server;
-		this.data = new ClientData(this);
 		this.connection = connection;
-		this.packetCompressor = new PacketCompressor(this);
-		this.protocol = ProtocolList[this.server.options.version as "1.21.50"];
+		this.server = server;
+		this.options = defaultClientOptions;
+		this._compressionEnabled = false;
+		this._encryptionEnabled = false;
+		this.options.compressionMethod = this.server.options.compressionMethod;
+		this.options.compressionThreshold =
+			this.server.options.compressionThreshold;
 		this.prepare();
-		this.initializeStaticPackets();
 	}
 
-	private initializeStaticPackets() {
-		const settings = Player.DEFAULT_NETWORK_SETTINGS;
-		settings.compressionThreshold = this.server.options.compressionThreshold;
-		settings.compressionMethod = this.server.options.compressionMethod;
-		this.preSerializedPackets.set(NetworkSettingsPacket, settings.serialize());
+	public processPacket(buffer: Buffer) {
+		if (buffer.length < 1) return;
+		const id = getPacketId(buffer);
+		const PacketClass = Packets[id];
+
+		try {
+			if (!PacketClass) {
+				Logger.debug(`Received Unknown Packet: ${id}`);
+				return;
+			}
+
+			const instance = new PacketClass(buffer);
+			instance.deserialize();
+
+			/** For debugging or etc, incase one needs a list of packets or their data. */
+			if (this.hasListeners("packet")) {
+				this.emit("packet", instance);
+			}
+
+			/** We emit all packets as classes from SerenityJS Protocol */
+			this.emit(PacketClass.name as PacketNames, instance);
+		} catch (error) {
+			Logger.error(
+				`Received an Error while deserializing packet ${PacketClass ?? id}`,
+			);
+			Logger.error(error as Error);
+		}
 	}
 
-	private prepare() {
-		if (!(this.connection instanceof RakConnection))
-			throw new Error("Connection is not instance of RakConnection");
+	public onEncapsulated(buffer: Buffer) {
+		const decompressed = this.packetCompressor.decompress(buffer);
+		for (const packet of decompressed) {
+			this.processPacket(packet);
+		}
+	}
 
-		this.connection.on("encapsulated", this.handle.bind(this));
-		this.connection.on("disconnect", () => this.server.onDisconnect(this));
-		this.once("SetLocalPlayerAsInitializedPacket", () => {
-			this.status = Status.Connected;
-		});
-		this.once("RequestNetworkSettingsPacket", () => {
-			this.status = Status.Connecting;
-			const preSerialized = this.preSerializedPackets.get(
-				NetworkSettingsPacket,
-			);
-			if (preSerialized) {
-				this.send(preSerialized);
-			} else {
-				const settings = Player.DEFAULT_NETWORK_SETTINGS;
-				settings.compressionThreshold =
-					this.server.options.compressionThreshold;
-				settings.compressionMethod = this.server.options.compressionMethod;
-				this.send(settings);
-			}
+	private sendPacket(
+		packet: DataPacket | Buffer,
+		priority: Priority = Priority.Normal,
+	): void {
+		try {
+			if (this.status === Status.Disconnected) return;
 
-			this._compressionEnabled = true;
-			this.options.compressionMethod = this.server.options.compressionMethod;
-			this.options.compressionLevel = this.server.options.compressionLevel;
-			this.options.compressionThreshold =
-				this.server.options.compressionThreshold;
-		});
-
-		this.once("LoginPacket", async (packet) => {
-			try {
-			const { key, data, skin } = await decodeLoginJWT(
-				packet.tokens,
-				this.server.options.version,
-			);
-			const extraData = (data as { extraData: object }).extraData as {
-				displayName: string;
-				identity: string;
-				XUID: number;
-				titleid: string;
-				sandboxId: string;
-			};
-
-			this.profile = {
-				name: extraData.displayName,
-				uuid: extraData.identity,
-				xuid: extraData.XUID,
-			};
-
-			this.data.payload = skin as Payload;
-
-			const pubKeyDer = createPublicKey({
-				key: Buffer.from(key, "base64"),
-				format: "der",
-				type: "spki",
-			});
-
-			this.data.sharedSecret = this.data.createSharedSecret(
-				this.data.loginData.ecdhKeyPair.privateKey,
-				pubKeyDer,
+			const serialized =
+				packet instanceof DataPacket ? packet.serialize() : packet;
+			const compressed = this.packetCompressor.compress(
+				serialized,
+				this.options.compressionMethod,
 			);
 
-			const secretHash = createHash("sha256")
-				.update(SALT_BUFFER)
-				.update(this.data.sharedSecret);
-			this.secretKeyBytes = secretHash.digest();
-			this.iv = this.secretKeyBytes.slice(0, 16);
-
-			const privateKey = await jose.importPKCS8(
-				this.data.loginData.ecdhKeyPair.privateKey.export({
-					format: "pem",
-					type: "pkcs8",
-				}) as string,
-				"ES384",
+			const frame = new Frame();
+			frame.orderChannel = 0;
+			frame.payload = compressed;
+			this.connection.sendFrame(frame, priority);
+		} catch (error) {
+			Logger.error(
+				`Failed to send packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
+				error,
 			);
+		}
+	}
 
-			const token = await new jose.SignJWT({
-				salt: SALT_BUFFER.toString("base64"),
-				signedToken: this.data.loginData.clientX509,
-			})
-				.setProtectedHeader({
-					alg: "ES384",
-					x5u: this.data.loginData.clientX509,
-				})
-				.sign(privateKey);
+	public send(packet: DataPacket | Buffer): void {
+		this.sendPacket(packet, Priority.Immediate);
+	}
 
-			const handshake = new ServerToClientHandshakePacket();
-			handshake.token = token;
-			this.send(handshake);
-
-			this.startEncryption(this.iv);
-
-			this.emit("login");
-			Logger.debug(`Enabling Encryption for ${this.profile.name}`);
-			} catch (error) {
-				Logger.error(`Error decoding login JWT: ${error}`);
-				this.sendDisconnectMessage("Version mismatch, please update your client!");
-			}
-		});
-
-		this.once("ClientToServerHandshakePacket", () => {
-			this.send(PLAY_STATUS_LOGIN_SUCCESS_BUFFER);
-		});
+	public queue(packet: DataPacket | Buffer): void {
+		Logger.debug(
+			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
+		);
+		this.sendPacket(packet, Priority.Normal);
 	}
 
 	public startEncryption(iv: Buffer) {
@@ -201,80 +150,87 @@ class Player extends Emitter<PlayerEvents> {
 		}
 	}
 
-	public sendDisconnectMessage(message: string){
-		const disconnect = new DisconnectPacket();
-		disconnect.hideDisconnectScreen = false;
-		disconnect.message = new DisconnectMessage(message, message);
-		disconnect.reason = DisconnectReason.VersionMismatch;
-		this.sendPacket(disconnect, Priority.Immediate);
-	}
+	public prepare() {
+		this.loginData = prepareLoginData();
+		this.packetCompressor = new PacketCompressor(this);
+		// this.packetEncryptor = new PacketEncryptor(this);
+		this.connection.on("encapsulated", this.onEncapsulated.bind(this));
+		this.on("RequestNetworkSettingsPacket", (packet) => {
+			this.status = Status.Connecting;
+			const settings = new NetworkSettingsPacket();
+			settings.compressionThreshold = this.server.options.compressionThreshold;
+			settings.clientScalar = 0;
+			settings.clientThreshold = 0;
+			settings.clientThrottle = false;
+			settings.compressionMethod = this.server.options.compressionMethod;
+			this.send(settings);
+			this._compressionEnabled = true;
+		});
 
-	public sendPacket(
-		packet: DataPacket | Buffer,
-		priority: Priority = Priority.Normal,
-	) {
-		if (this.status === Status.Disconnected) return;
-		let serialized: Buffer;
-		if (packet instanceof DataPacket) {
-			const preSerialized = this.preSerializedPackets.get(packet.constructor);
-			serialized = preSerialized || packet.serialize();
-		} else {
-			serialized = packet;
-		}
+		this.on("LoginPacket", async (packet) => {
+			// TODO! Verify JWT.
 
-		const compressed = this.packetCompressor.compress(
-			serialized,
-			this.options.compressionMethod,
-		);
+			const { key, data, skin } = await decodeLoginJWT(
+				packet.tokens,
+				CurrentVersionConst,
+			);
+			const extraData = (data as { extraData: object }).extraData as {
+				displayName: string;
+				identity: string;
+				XUID: number;
+				titleid: string;
+				sandboxId: string;
+			};
+			this.username = extraData.displayName;
 
-		const frame = new Frame();
-		frame.orderChannel = 0;
-		frame.payload = compressed;
-		this.connection.sendFrame(frame, priority);
-	}
+			this.loginPayload = skin as Payload;
 
-	public send(packet: DataPacket | Buffer) {
-		this.sendPacket(packet, Priority.Immediate);
-	}
+			const pubKeyDer = createPublicKey({
+				key: Buffer.from(key, "base64"),
+				format: "der",
+				type: "spki",
+			});
+			this.sharedSecret = ClientData.createSharedSecret(
+				this.loginData.ecdhKeyPair.privateKey,
+				pubKeyDer,
+			);
 
-	public queue(packet: DataPacket | Buffer) {
-		this.sendPacket(packet, Priority.Normal);
-	}
+			const secretHash = createHash("sha256")
+				.update(SALT_BUFFER)
+				.update(this.sharedSecret);
+			this.secretKeyBytes = secretHash.digest();
+			this.iv = this.secretKeyBytes.slice(0, 16);
 
-	public processPacket(packet: Buffer) {
-		const id = packet.readUInt8(0);
-		if (id === Player.PACKET_CACHE_STATUS_ID) {
-			Logger.debug("Received ClientCacheStatusPacket");
-			const instance = new ClientCacheStatusPacket(packet);
-			instance.deserialize();
-			this.emit("ClientCacheStatusPacket", instance);
-			return;
-		}
+			const privateKey = await jose.importPKCS8(
+				this.loginData.ecdhKeyPair.privateKey.export({
+					format: "pem",
+					type: "pkcs8",
+				}) as string,
+				"ES384",
+			);
 
-		// @ts-ignore
-		const PacketClass = Packets[id];
-		if (!PacketClass) {
-			Logger.debug(`Received Unknown Packet: ${id}`);
-			return;
-		}
+			const token = await new jose.SignJWT({
+				salt: SALT_BUFFER.toString("base64"),
+				signedToken: this.loginData.clientX509,
+			})
+				.setProtectedHeader({
+					alg: "ES384",
+					x5u: this.loginData.clientX509,
+				})
+				.sign(privateKey);
 
-		const instance = new PacketClass(packet);
-		instance.deserialize();
+			const handshake = new ServerToClientHandshakePacket();
+			handshake.token = token;
+			this.send(handshake);
 
-		if (this.hasListeners("packet")) {
-			this.emit("packet", instance);
-		}
-		this.emit(PacketClass.name as PacketNames, instance);
-	}
+			this.startEncryption(this.iv);
+			this.emit("login");
+		});
 
-	public async handle(packet: Buffer) {
-		const packets = await this.packetCompressor.decompress(packet);
-		let i = 0;
-		while (i < packets.length) {
-			this.processPacket(packets[i]);
-			i++;
-		}
+		this.on("ClientToServerHandshakePacket", () => {
+			const status = new PlayStatusPacket();
+			status.status = PlayStatus.LoginSuccess;
+			this.send(status);
+		});
 	}
 }
-
-export { Player };

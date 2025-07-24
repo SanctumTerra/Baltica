@@ -1,303 +1,145 @@
-# Baltica
+# <p align="center"> Baltica 🌊 </p>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/SanctumTerra/Baltica/master/.extra/logo.png" alt="Baltica Logo" width="200"/>
 </p>
 
+<p align="center">
+  <em>A blazing fast Minecraft Bedrock toolkit for TypeScript developers</em>
+</p>
+
 ---
-**Supported Versions**   `1.21.80` `1.21.70` `1.21.60` `1.21.50`
+
+## 🚀 What's New in v0.1.0
+
+We've completely rewritten Baltica from the ground up! Here's what makes it awesome:
+
+**⚡ Lightning Fast Performance** - We obsessed over every millisecond to make this as snappy as possible
+
+**🎯 Full TypeScript Support** - Proper types everywhere, so your IDE will actually help you instead of fighting you
+
+**🔧 Zero Maintenance Headaches** - Built on top of solid libraries like `@serenityjs/protocol` and `@serenityjs/binarystream` so we don't have to reinvent the wheel
+
+**🎪 Triple Threat** - Three tools in one package: Server, Client, and Bridge (MITM Proxy)
+
 ---
 
-Baltica is a high-performance Minecraft Bedrock Edition networking toolkit built with TypeScript. It serves three main purposes:
-1. A powerful bridge/proxy that can modify, intercept, and manipulate network traffic between Minecraft Bedrock clients and servers
-2. A robust client library for creating Minecraft Bedrock bots and automated players
-3. A flexible server implementation for creating custom Minecraft Bedrock servers
+## 📋 Version Support
 
-## Features
+`0.1.0` → Minecraft Bedrock `1.21.93`
 
-- 🚀 High-performance packet handling and forwarding
-- 🤖 Bot creation and automation
-- 🔒 Support for encryption and compression
-- 🎮 Multiple protocol version support (1.21.50 - 1.21.80)
-- 🌐 Customizable packet manipulation
-- 🔄 Packet caching for improved performance
-- 📦 Resource pack handling
-- 🎯 Event-driven architecture
-- 🤝 Multi-client support for running multiple bots
-- 🖥️ Custom server implementation
-- ⚡ Bun runtime support for enhanced performance
+*Note: We dropped multi-version support because honestly, it was more trouble than it was worth. One version, done right.*
 
-## Prerequisites
+---
 
-- Node.js (v16 or higher recommended) or Bun runtime
-- TypeScript
-- npm, yarn, or bun
+## 🛠️ Getting Started
 
-## Installation
+### Client Usage
 
-### Using Package Manager (Recommended)
-
-```bash
-# Using npm
-npm install baltica
-
-# Using yarn
-yarn add baltica
-
-# Using bun
-bun add baltica
-```
-
-### From Source
-
-If you want to contribute or modify the source code:
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/baltica.git
-cd baltica
-```
-
-2. Install dependencies:
-```bash
-# Using npm
-npm install
-
-# Using yarn
-yarn install
-
-# Using bun
-bun install
-```
-
-3. Build the project:
-```bash
-# Using npm
-npm run build
-
-# Using yarn
-yarn build
-
-# Using bun
-bun run build
-```
-
-## Quick Start
+Perfect for creating bots, automation tools, or custom clients:
 
 ```typescript
-import { Client, Server, Bridge } from 'baltica';
-
-// Create a bot
-const bot = new Client({
-    host: 'server-address',
-    port: 19132,
-    version: '1.21.80',
-    username: 'MyBot'
+const client = new Client({
+  offline: false, // Set to true if you don't want Xbox Live authentication
+  username: 'MyAwesomeBot',
+  address: "127.0.0.1",
+  port: 19132,
 });
 
-// Create a server
-const server = new Server({
-    host: '0.0.0.0',
-    port: 19132,
-    maxPlayers: 20
+// Connect and get server info
+await client.connect();
+
+// Listen for chat messages
+client.on("TextPacket", (packet) => {
+  console.log(`Got message: ${packet.message}`);
 });
 
-// Create a bridge
-const bridge = new Bridge({
-    host: '0.0.0.0',
-    port: 19132,
-    destination: {
-        host: 'target-server.com',
-        port: 19132
-    }
+// Send a friendly greeting when connected
+client.on("connect", () => {
+  const packet = new TextPacket();
+   packet.message = 'Hey everyone! 👋';
+   packet.needsTranslation = false;
+   packet.parameters = [];
+   packet.platformChatId = '';
+   packet.source = client.username;
+   packet.type = TextPacketType.Chat;
+   packet.xuid = client.profile.xuid.toString();
+   packet.filtered = '';
+  client.send(packet.serialize());
 });
 ```
 
-## Usage
+### Server Usage
 
-### Creating a Custom Server
+Want to create your own Minecraft server? We got you:
 
 ```typescript
-import { Server } from './src/server/server';
-
 const server = new Server({
-    host: '0.0.0.0',
-    port: 19132,
-    version: '1.21.80',
-    maxPlayers: 20
-});
-
-// Handle player connections
-server.on('playerConnect', (player) => {
-    console.log(`Player ${player.profile.name} connected!`);
-    
-    // Handle player packets
-    player.on('TextPacket', (packet) => {
-        // Broadcast chat messages
-        if (packet.type === TextPacketType.Chat) {
-            server.broadcast(`${player.profile.name}: ${packet.message}`);
-        }
-    });
-});
-
-// Handle disconnections
-server.on('disconnect', (displayName, player) => {
-    console.log(`Player ${displayName} disconnected`);
+  address: "127.0.0.1",
+  port: 19132
 });
 
 server.start();
-```
 
-### Creating Minecraft Bots
-
-```typescript
-import { Client } from './src/client/client';
-
-// Create a basic bot
-const bot = new Client({
-    host: 'server-address',
-    port: 19132,
-    version: '1.21.80',
-    username: 'MyBot',
-    tokensFolder: 'tokens',
-    viewDistance: 10
-});
-
-// Connect and handle events
-await bot.connect();
-
-// Listen for chat messages
-bot.on('TextPacket', (packet) => {
-    if (packet.type === TextPacketType.Chat) {
-        console.log(`${packet.source}: ${packet.message}`);
-        
-        // Respond to messages
-        if (packet.message.startsWith('!hello')) {
-            bot.sendMessage('Hello there!');
-        }
-    }
-});
-
-// Handle player movement
-bot.on('MovePlayerPacket', (packet) => {
-    // React to player movements
-    console.log(`Player ${packet.runtimeEntityId} moved to ${packet.position}`);
+server.on("playerConnect", (player) => {
+  console.log(`${player.username} is connecting...`);
+  
+  player.on("login", () => {
+    console.log(`Welcome ${player.username}! 🎉`);
+  });
 });
 ```
 
-### Running Multiple Bots
+### Bridge/Proxy Usage
+
+This is where things get spicy - intercept and modify packets on the fly:
 
 ```typescript
-async function createBots(count: number) {
-    const bots = [];
-    
-    for (let i = 0; i < count; i++) {
-        const bot = new Client({
-            host: 'server-address',
-            port: 19132,
-            version: '1.21.80',
-            username: `Bot${i}`,
-            tokensFolder: 'tokens',
-            viewDistance: 2,  // Lower view distance for better performance
-            worker: true      // Enable worker mode for better performance
-        });
-        
-        await bot.connect();
-        bots.push(bot);
-    }
-    
-    return bots;
-}
-
-// Create 5 bots
-const myBots = await createBots(5);
-```
-
-### Basic Bridge Setup
-
-```typescript
-import { Bridge } from './src/bridge/bridge';
+import { Bridge } from "baltica";
 
 const bridge = new Bridge({
-    host: '0.0.0.0',
+  destination: {
+    address: "127.0.0.1", // Your actual server
     port: 19132,
-    destination: {
-        host: 'target-server.com',
-        port: 19132
-    },
-    version: '1.21.80',
-    maxPlayers: 20
+  },
+  address: "0.0.0.0", // Proxy address
+  port: 19133,        // Proxy port
 });
 
 bridge.start();
-```
 
-## Configuration Options
-
-### Server Options
-- `host`: The IP address to bind the server to
-- `port`: The port to listen on
-- `version`: Minecraft protocol version
-- `maxPlayers`: Maximum number of concurrent players
-- `motd`: Message of the day
-
-### Client/Bot Options
-- `host`: Target server address
-- `port`: Target server port
-- `version`: Protocol version
-- `username`: Bot username
-- `tokensFolder`: Directory for authentication tokens
-- `viewDistance`: Render distance (lower values improve performance)
-- `offline`: Enable offline mode
-- `worker`: Enable worker mode for improved performance with multiple bots
-- `deviceOS`: Device OS to emulate (defaults to Nintendo Switch)
-- `skinData`: Custom skin data for the bot
-
-### Bridge Options
-- `host`: The IP address to bind the bridge server to
-- `port`: The port to listen on
-- `destination`: Target server configuration (host and port)
-- `version`: Minecraft protocol version
-- `maxPlayers`: Maximum number of concurrent players
-
-## Events
-
-Baltica uses an event-driven architecture across all its components. Each component (Server, Client/Bot, Bridge) emits events that you can listen to for various game events and packet handling.
-
-```typescript
-// Example of event handling
-client.on('packet', (packet) => {
-    // Handle any packet
-});
-
-bridge.on('connect', (player) => {
-    // Handle player connection
-});
-
-server.on('playerConnect', (player) => {
-    // Handle new player
+// Intercept all connections
+bridge.on("connect", (player) => {
+  console.log(`Player connected through proxy: ${player.client.username}`);
+  
+  // Listen to messages going TO the client
+  player.on("clientBound-TextPacket", (signal) => {
+    console.log(`Server said: ${signal.packet.message}`);
+  });
+  
+  // Modify messages coming FROM the client
+  player.on("serverBound-TextPacket", (signal) => {
+    // Add a fun prefix to all messages
+    signal.packet.message = `[${player.client.username}]: ${signal.packet.message}`;
+    signal.modified = true; // Don't forget this!
+  });
 });
 ```
 
-For detailed event documentation, please refer to our [API Documentation](https://github.com/SanctumTerra/Baltica/wiki).
+---
 
-## Performance
+## 🤝 Contributing
 
-Baltica supports both Node.js and Bun runtimes, with Bun offering significant performance improvements:
-- Faster startup times
-- Lower memory usage
-- Better packet processing performance
-- Improved concurrent connections handling
+Found a bug? Have a cool idea? We'd love to hear from you! Open an issue or submit a PR.
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 📄 License
 
-## License
+This project is licensed under the MIT License - because sharing is caring.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+---
 
-## Acknowledgments
-
-- Built with [@serenityjs/protocol](https://github.com/SerenityJS/protocol) for Minecraft protocol implementation
-- Uses [@sanctumterra/raknet](https://github.com/sanctumterra/raknet) for RakNet networking
+<p align="center">
+  Made with ❤️ by the SanctumTerra team
+</p>

@@ -1,3 +1,3 @@
 export * from "./server";
-export * from "./server-options";
+export * from "./types";
 export * from "./player";

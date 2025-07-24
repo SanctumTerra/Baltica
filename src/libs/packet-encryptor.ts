@@ -2,7 +2,7 @@ import * as crypto from "node:crypto";
 import * as Zlib from "node:zlib";
 import { CompressionMethod } from "@serenityjs/protocol";
 import type { Client } from "../client/client";
-import type { Player } from "../server/player";
+import type { Player } from "../server";
 
 class PacketEncryptor {
 	static instance: PacketEncryptor;

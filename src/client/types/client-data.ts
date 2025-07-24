@@ -1,18 +1,15 @@
-import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
-import type { Client } from "./client";
+import { IdentityData, LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import { v3 as uuidv3 } from "uuid-1345";
-import { type Payload, createDefaultPayload } from "./types/payload";
 import * as jose from "jose";
-import {
-	Certificate,
-	createECDH,
-	KeyObject,
-	type KeyExportOptions,
-} from "node:crypto";
-import { type LoginData, prepareLoginData } from "./types/login-data";
+import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
-import type { Player } from "../server/player";
-import { versionHigherThan } from "./client-options";
+import { type Client, createDefaultPayload, type Payload } from "../";
+import {
+	CurrentVersionConst,
+	ProtocolList,
+	versionHigherThan,
+} from "../../types";
+import { type LoginData, prepareLoginData } from "./login-data";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -22,7 +19,7 @@ const pem: KeyExportOptions<"pem"> = { format: "pem", type: "sec1" };
 const der: KeyExportOptions<"der"> = { format: "der", type: "spki" };
 
 class ClientData {
-	public client: Client | Player;
+	public client: Client; // | Player;
 	/** This Contains a lot of Data for the Login Packet */
 	public payload: Payload;
 	/** This Contains the Access Tokens from Auth */
@@ -31,8 +28,10 @@ class ClientData {
 	public loginData: LoginData;
 	/** This Contains the Shared Secret */
 	public sharedSecret!: Buffer;
+	/** This tells the jwt to use legacy auth */
+	public legacy = true;
 
-	constructor(client: Client | Player) {
+	constructor(client: Client) {
 		this.client = client;
 		this.payload = createDefaultPayload(client);
 		this.loginData = prepareLoginData();
@@ -42,30 +41,20 @@ class ClientData {
 		const loginPacket = new LoginPacket();
 		const chain = [this.loginData.clientIdentityChain, ...this.accessToken];
 		const userChain = this.loginData.clientUserChain;
-		let encodedChain = "";
-		if (versionHigherThan(this.client.options.version, "1.21.80")) {
-			const certificate = JSON.stringify({ chain });
-			encodedChain = JSON.stringify({
-				AuthenticationType: 2,
-				Certificate: certificate,
-				Token: "",
-			});
-		} else {
-			encodedChain = JSON.stringify({ chain });
-		}
-		loginPacket.protocol = this.client.protocol;
+		const certificate = JSON.stringify({ chain });
+
+		const encodedChain = JSON.stringify({
+			AuthenticationType: this.client.options.offline ? 2 : 0,
+			Certificate: certificate,
+			Token: "",
+		});
+
+		loginPacket.protocol = ProtocolList[CurrentVersionConst];
 		loginPacket.tokens = new LoginTokens(userChain, encodedChain);
 		return loginPacket;
 	}
 
 	public async createClientChain(
-		mojangKey: string | null,
-		offline: boolean,
-	): Promise<string> {
-		return this.createClientChainInternal(mojangKey, offline);
-	}
-
-	private async createClientChainInternal(
 		mojangKey: string | null,
 		offline: boolean,
 	): Promise<string> {
@@ -123,7 +112,7 @@ class ClientData {
 		const payload: Payload = {
 			...this.payload,
 			...customPayload,
-			ServerAddress: `${this.client.options.host}:${this.client.options.port}`,
+			ServerAddress: `${this.client.options.address}:${this.client.options.port}`,
 			ClientRandomId: Date.now(),
 			DeviceId: ClientData.nextUUID(this.client.profile?.name),
 			PlayFabId: ClientData.nextUUID(this.client.profile?.name)
@@ -142,11 +131,11 @@ class ClientData {
 			.sign(josePrivateKey);
 	}
 
-	public createSharedSecret(
+	public static createSharedSecret(
 		privateKey: KeyObject,
 		publicKey: KeyObject,
 	): Buffer {
-		this.validateKeys(privateKey, publicKey);
+		ClientData.validateKeys(privateKey, publicKey);
 
 		const curve = privateKey.asymmetricKeyDetails?.namedCurve;
 		if (!curve) {
@@ -188,7 +177,7 @@ class ClientData {
 		}
 	}
 
-	private validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
+	static validateKeys(privateKey: KeyObject, publicKey: KeyObject): void {
 		if (
 			!(privateKey instanceof KeyObject) ||
 			!(publicKey instanceof KeyObject)

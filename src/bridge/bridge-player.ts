@@ -1,51 +1,87 @@
 import {
-	DisconnectMessage,
-	DisconnectPacket,
-	DisconnectReason,
-	type LevelChunkPacket,
+	type ClientToServerHandshakePacket,
+	DataPacket,
+	getPacketId,
+	Packets,
+	PlayStatus,
 } from "@serenityjs/protocol";
-import type { Client, PacketNames } from "../client";
-import { Emitter } from "../libs";
 import type { Player } from "../server";
+import { Client } from "../client";
 import type { Bridge } from "./bridge";
-import type { BridgePlayerEvents } from "./bridge-options";
+import { Emitter } from "../libs";
+import type { BridgePlayerEvents } from "./types";
 
 export class BridgePlayer extends Emitter<BridgePlayerEvents> {
-	public player!: Player;
-	public bridge!: Bridge;
+	public bridge: Bridge;
+	public player: Player;
 	public client!: Client;
-	public cacheStatus!: boolean;
-	public postStartGame: boolean;
-	public levelChunkQueue: LevelChunkPacket[];
 
-	constructor(bridge: Bridge, player: Player) {
+	constructor(player: Player, bridge: Bridge) {
 		super();
-		this.bridge = bridge;
 		this.player = player;
-		this.postStartGame = false;
-		this.levelChunkQueue = [];
-		this.once("clientbound-StartGamePacket", (packet, eventStatus) => {
-			this.postStartGame = true;
-			for (const chunk of this.levelChunkQueue) {
-				const eventName =
-					"clientbound-LevelChunkPacket" as keyof BridgePlayerEvents & string;
-				this.emit(eventName, chunk, { cancelled: false, modified: false });
-			}
-		});
+		this.bridge = bridge;
+		this.player.once(
+			"ClientToServerHandshakePacket",
+			this.onHandshake.bind(this),
+		);
 	}
 
-	public prepare(): void {
-		this.player.connection.on("disconnect", () => {
-			const disconnect = new DisconnectPacket();
-			disconnect.hideDisconnectScreen = false;
-			disconnect.message = new DisconnectMessage("");
-			disconnect.reason =
-				DisconnectReason.UnspecifiedClientInstanceDisconnection;
-			this.client.send(disconnect);
+	private onHandshake(packet: ClientToServerHandshakePacket) {
+		this.client = new Client({
+			address: this.bridge.options.destination.address,
+			port: this.bridge.options.destination.port,
+			offline: this.bridge.options.offline,
 		});
+		this.client.cancelPastLogin = true;
+
+		this.client.once("PlayStatusPacket", (packet) => {
+			if (packet.status !== PlayStatus.LoginSuccess)
+				throw new Error("Login failed");
+			this.client.processPacket = (buffer: Buffer) => {
+				this.handlePacket(buffer, true);
+			};
+			this.player.processPacket = (buffer: Buffer) => {
+				this.handlePacket(buffer, false);
+			};
+		});
+		this.client.on("DisconnectPacket", (packet) =>
+			this.bridge.disconnect(this),
+		);
+		this.player.on("DisconnectPacket", (packet) =>
+			this.bridge.disconnect(this),
+		);
+		this.on("clientBound-DisconnectPacket", (signal) =>
+			this.bridge.disconnect(this),
+		);
+		this.on("serverBound-DisconnectPacket", (signal) =>
+			this.bridge.disconnect(this),
+		);
+		this.player.connection.on("disconnect", () => this.bridge.disconnect(this));
+		this.client.connect();
 	}
 
-	public getClient(): Client {
-		return this.client;
+	public handlePacket(rawBuffer: Buffer, clientBound: boolean) {
+		let buffer = rawBuffer;
+		const id = getPacketId(buffer);
+		const PacketClass = Packets[id as keyof typeof Packets];
+		const event = PacketClass
+			? `${clientBound ? "server" : "client"}Bound-${PacketClass.name}`
+			: "Unknown";
+		if (
+			this.hasListeners(event as keyof BridgePlayerEvents) &&
+			event !== "Unknown"
+		) {
+			const ctx = {
+				packet: new PacketClass(buffer).deserialize(),
+				cancelled: false,
+				modified: false,
+			};
+
+			this.emit(event as keyof BridgePlayerEvents, ctx);
+			if (ctx.cancelled) return;
+			if (ctx.modified) buffer = ctx.packet.serialize();
+		}
+		if (clientBound) this.player.send(buffer);
+		else this.client.send(buffer);
 	}
 }
