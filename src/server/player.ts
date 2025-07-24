@@ -32,7 +32,7 @@ import {
 	ServerToClientHandshakePacket,
 } from "@serenityjs/protocol";
 import type { PlayerEvents } from "./types";
-import { CurrentVersionConst } from "src/types";
+import { CurrentVersionConst } from "../types";
 import { createHash, createPublicKey } from "node:crypto";
 import * as jose from "jose";
 

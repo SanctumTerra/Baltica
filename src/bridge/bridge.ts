@@ -1,4 +1,4 @@
-import type { ForceArray } from "src/libs/emitter";
+import type { ForceArray } from "../libs/emitter";
 import { type Player, Server } from "../server";
 import { BridgePlayer } from "./bridge-player";
 import { type BridgeOptions, defaultBridgeOptions } from "./types";

@@ -1,6 +1,6 @@
 import type * as Protocol from "@serenityjs/protocol";
 import type { Advertisement } from "@sanctumterra/raknet";
-import type { PacketNames } from "src/types";
+import type { PacketNames } from "../../types";
 
 type ClientEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];

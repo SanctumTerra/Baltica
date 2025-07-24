@@ -1,4 +1,4 @@
-import type { PacketNames } from "src/client";
+import type { PacketNames } from "../../types";
 import type * as Protocol from "@serenityjs/protocol";
 
 export type PlayerEvents = {

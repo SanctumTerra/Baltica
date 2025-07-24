@@ -1,4 +1,4 @@
-import { CurrentVersionConst, DeviceOS } from "src/types";
+import { CurrentVersionConst, DeviceOS } from "../../types";
 import type { Client } from "../";
 import { ClientData } from "./client-data";
 

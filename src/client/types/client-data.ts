@@ -8,7 +8,7 @@ import {
 	CurrentVersionConst,
 	ProtocolList,
 	versionHigherThan,
-} from "src/types";
+} from "../../types";
 import { type LoginData, prepareLoginData } from "./login-data";
 
 const PUBLIC_KEY =
