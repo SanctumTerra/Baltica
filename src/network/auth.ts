@@ -6,7 +6,7 @@ import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import type { Client } from "../client/client";
 import { Bedrock } from "./beta/auth";
-import { versionHigherThan } from "src/client";
+import { versionHigherThan } from "../client";
 import type { Version } from "../server";
 
 export interface Profile {
