@@ -54,6 +54,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for git log
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -76,6 +78,58 @@ jobs:
         run: |
           echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           echo "minecraft=$(node -p "require('./package.json').minecraft")" >> $GITHUB_OUTPUT
+      - name: Generate release notes
+        if: success()
+        id: release-notes
+        run: |
+          # Get the latest release tag (if any)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          # Set the range for git log
+          if [ -z "$LATEST_TAG" ]; then
+            # If no previous tag, get all commits
+            COMMIT_RANGE=""
+            echo "No previous release found, including all commits"
+          else
+            # Get commits since the last tag
+            COMMIT_RANGE="${LATEST_TAG}..HEAD"
+            echo "Getting commits since ${LATEST_TAG}"
+          fi
+          
+          # Start building the release notes
+          RELEASE_NOTES="Release for Baltica v${{ steps.package-info.outputs.version }}
+          Compatible with Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}
+          
+          ## Commits"
+          
+          # Add commit list
+          if [ -z "$COMMIT_RANGE" ]; then
+            COMMITS=$(git log --pretty=format:"- \`%h\` - %s" --reverse)
+          else
+            COMMITS=$(git log ${COMMIT_RANGE} --pretty=format:"- \`%h\` - %s" --reverse)
+          fi
+          
+          RELEASE_NOTES="$RELEASE_NOTES
+          $COMMITS
+          
+          ## Contributors"
+          
+          # Add contributors list
+          if [ -z "$COMMIT_RANGE" ]; then
+            CONTRIBUTORS=$(git log --pretty=format:"%an <%ae>" | sort | uniq | sed 's/^/- /')
+          else
+            CONTRIBUTORS=$(git log ${COMMIT_RANGE} --pretty=format:"%an <%ae>" | sort | uniq | sed 's/^/- /')
+          fi
+          
+          RELEASE_NOTES="$RELEASE_NOTES
+          $CONTRIBUTORS"
+          
+          # Set the release notes as output (escaped for GitHub Actions)
+          {
+            echo "notes<<EOF"
+            echo "$RELEASE_NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
       - name: Create Release
         if: success()
         env:
@@ -83,6 +137,5 @@ jobs:
         run: |
           gh release create v${{ steps.package-info.outputs.version }} \
             --title "Release v${{ steps.package-info.outputs.version }} for Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}" \
-            --notes "Release for Baltica v${{ steps.package-info.outputs.version }}
-            Compatible with Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}" \
+            --notes "${{ steps.release-notes.outputs.notes }}" \
             --target ${{ github.sha }}
