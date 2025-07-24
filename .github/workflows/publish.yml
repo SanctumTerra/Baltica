@@ -116,9 +116,29 @@ jobs:
           
           # Add contributors list
           if [ -z "$COMMIT_RANGE" ]; then
-            CONTRIBUTORS=$(git log --pretty=format:"%an <%ae>" | sort | uniq | sed 's/^/- /')
+            CONTRIBUTORS=$(git log --pretty=format:"%an <%ae>" | sort | uniq | while read line; do
+              name=$(echo "$line" | sed 's/ <.*//')
+              email=$(echo "$line" | sed 's/.*<//' | sed 's/>//')
+              if [[ "$email" == *"@users.noreply.github.com" ]]; then
+                # Extract GitHub username from noreply email
+                github_user=$(echo "$email" | sed 's/.*+//' | sed 's/@users.noreply.github.com//')
+                echo "- $name (@$github_user)"
+              else
+                echo "- $name <$email>"
+              fi
+            done)
           else
-            CONTRIBUTORS=$(git log ${COMMIT_RANGE} --pretty=format:"%an <%ae>" | sort | uniq | sed 's/^/- /')
+            CONTRIBUTORS=$(git log ${COMMIT_RANGE} --pretty=format:"%an <%ae>" | sort | uniq | while read line; do
+              name=$(echo "$line" | sed 's/ <.*//')
+              email=$(echo "$line" | sed 's/.*<//' | sed 's/>//')
+              if [[ "$email" == *"@users.noreply.github.com" ]]; then
+                # Extract GitHub username from noreply email
+                github_user=$(echo "$email" | sed 's/.*+//' | sed 's/@users.noreply.github.com//')
+                echo "- $name (@$github_user)"
+              else
+                echo "- $name <$email>"
+              fi
+            done)
           fi
           
           RELEASE_NOTES="$RELEASE_NOTES
