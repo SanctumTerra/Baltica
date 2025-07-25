@@ -82,7 +82,7 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 			if (ctx.cancelled) return;
 			if (ctx.modified) buffer = ctx.packet.serialize();
 		}
-		
+
 		if (clientBound) this.player.send(buffer);
 		else this.client.send(buffer);
 	}

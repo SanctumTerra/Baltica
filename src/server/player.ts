@@ -174,7 +174,7 @@ export class Player extends Emitter<PlayerEvents> {
 				packet.tokens,
 				CurrentVersionConst,
 			);
-			if(data === null) {
+			if (data === null) {
 				return;
 			}
 
