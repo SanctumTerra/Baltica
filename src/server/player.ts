@@ -174,6 +174,10 @@ export class Player extends Emitter<PlayerEvents> {
 				packet.tokens,
 				CurrentVersionConst,
 			);
+			if(data === null) {
+				return;
+			}
+
 			const extraData = (data as { extraData: object }).extraData as {
 				displayName: string;
 				identity: string;

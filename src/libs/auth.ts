@@ -231,6 +231,10 @@ const decodeLoginJWT = async (
 	let ClientUserChain = [];
 
 	if (versionHigherThan(version, "1.21.80")) {
+		if(!payload.Certificate) {
+			Logger.error("No certificate found in identity, possible version mismatch!");
+			return { key: null, data: null, skin: null };
+		}
 		const parsed = JSON.parse(payload.Certificate);
 		ClientUserChain = parsed.chain;
 	} else {
@@ -243,6 +247,7 @@ const decodeLoginJWT = async (
 
 	const auth = await readAuth(ClientUserChain);
 	const skin = await readSkin(auth.key, tokens.client);
+
 	return { key: auth.key, data: auth.data, skin };
 };
 
