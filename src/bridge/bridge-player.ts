@@ -61,11 +61,11 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 	}
 
 	public handlePacket(rawBuffer: Buffer, clientBound: boolean) {
-		let buffer = rawBuffer;
-		const id = getPacketId(buffer);
+		let buffer: Buffer = rawBuffer;
+		const id = getPacketId(rawBuffer);
 		const PacketClass = Packets[id as keyof typeof Packets];
 		const event = PacketClass
-			? `${clientBound ? "server" : "client"}Bound-${PacketClass.name}`
+			? `${clientBound ? "client" : "server"}Bound-${PacketClass.name}`
 			: "Unknown";
 		if (
 			this.hasListeners(event as keyof BridgePlayerEvents) &&
@@ -78,9 +78,11 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 			};
 
 			this.emit(event as keyof BridgePlayerEvents, ctx);
+
 			if (ctx.cancelled) return;
 			if (ctx.modified) buffer = ctx.packet.serialize();
 		}
+		
 		if (clientBound) this.player.send(buffer);
 		else this.client.send(buffer);
 	}
