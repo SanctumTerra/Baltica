@@ -184,3 +184,4 @@ src/tools/
 tests/
 chunks/
 ChunkTest.ts
+_/

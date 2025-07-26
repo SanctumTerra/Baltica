@@ -16,5 +16,5 @@
 		},
 		"outDir": "dist"
 	},
-	"exclude": ["node_modules", "dist", "tokens", "examples"]
+	"exclude": ["node_modules", "dist", "tokens", "examples", "_"]
 }
