@@ -290,7 +290,6 @@ export class Client extends Emitter<ClientEvents> {
 				serialized,
 				this.options.compressionMethod,
 			);
-			console.log(compressed);
 
 			const frame = new Frame();
 			frame.orderChannel = 0;
