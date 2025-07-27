@@ -24,10 +24,22 @@ import {
 	Status,
 } from "@sanctumterra/raknet";
 import { createHash, createPublicKey } from "node:crypto";
-import { authenticate, createOfflineSession, Emitter, PacketCompressor, PacketEncryptor, Profile } from "../libs";
-import { ClientData, ClientEvents, ClientOptions, defaultClientOptions } from "./types";
+import {
+	authenticate,
+	createOfflineSession,
+	Emitter,
+	PacketCompressor,
+	PacketEncryptor,
+	type Profile,
+} from "../libs";
+import {
+	ClientData,
+	type ClientEvents,
+	type ClientOptions,
+	defaultClientOptions,
+} from "./types";
 import { WorkerClient } from "./worker";
-import { CurrentVersionConst, PacketNames, ProtocolList } from "../types";
+import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
 
 export class Client extends Emitter<ClientEvents> {
 	/** Client Options that change decisions duh. */
@@ -278,7 +290,7 @@ export class Client extends Emitter<ClientEvents> {
 				serialized,
 				this.options.compressionMethod,
 			);
-			console.log(compressed)
+			console.log(compressed);
 
 			const frame = new Frame();
 			frame.orderChannel = 0;
