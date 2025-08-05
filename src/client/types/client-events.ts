@@ -1,5 +1,5 @@
-import type * as Protocol from "@serenityjs/protocol";
 import type { Advertisement } from "@sanctumterra/raknet";
+import type * as Protocol from "@serenityjs/protocol";
 import type { PacketNames } from "../../types";
 
 type ClientEvents = {
@@ -9,6 +9,10 @@ type ClientEvents = {
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
 	connect: [packet: Advertisement];
+} & {
+	// 0 - 255 : [buffer: Buffer]
+	// 256 - 65535 : [buffer: Buffer]
+	[K in `${number}`]: [buffer: Buffer]
 };
 
 export type { ClientEvents, PacketNames };

@@ -1,21 +1,4 @@
 import {
-	ClientCacheStatusPacket,
-	ClientToServerHandshakePacket,
-	ResourcePackClientResponsePacket,
-	ResourcePackResponse,
-	getPacketId,
-	Packets,
-	ResourcePacksInfoPacket,
-	type StartGamePacket,
-	DataPacket,
-	PlayStatus,
-	SetLocalPlayerAsInitializedPacket,
-	ServerboundLoadingScreenPacketPacket,
-	ServerboundLoadingScreenType,
-	RequestNetworkSettingsPacket,
-	RequestChunkRadiusPacket,
-} from "@serenityjs/protocol";
-import {
 	type Advertisement,
 	Frame,
 	Logger,
@@ -23,6 +6,23 @@ import {
 	Client as RaknetClient,
 	Status,
 } from "@sanctumterra/raknet";
+import {
+	ClientCacheStatusPacket,
+	ClientToServerHandshakePacket,
+	DataPacket,
+	getPacketId,
+	Packets,
+	PlayStatus,
+	RequestChunkRadiusPacket,
+	RequestNetworkSettingsPacket,
+	ResourcePackClientResponsePacket,
+	ResourcePackResponse,
+	ResourcePacksInfoPacket,
+	ServerboundLoadingScreenPacketPacket,
+	ServerboundLoadingScreenType,
+	SetLocalPlayerAsInitializedPacket,
+	type StartGamePacket,
+} from "@serenityjs/protocol";
 import { createHash, createPublicKey } from "node:crypto";
 import {
 	authenticate,
@@ -32,6 +32,7 @@ import {
 	PacketEncryptor,
 	type Profile,
 } from "../libs";
+import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
 import {
 	ClientData,
 	type ClientEvents,
@@ -39,7 +40,6 @@ import {
 	defaultClientOptions,
 } from "./types";
 import { WorkerClient } from "./worker";
-import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
 
 export class Client extends Emitter<ClientEvents> {
 	/** Client Options that change decisions duh. */
@@ -145,7 +145,11 @@ export class Client extends Emitter<ClientEvents> {
 
 		try {
 			if (!PacketClass || !PacketClass.name) {
-				Logger.warn(`Unknown Game packet ${id}`);
+				if (this.options.emitUnknownPackets) {
+					this.emit(`${id}` as `${number}`, buffer);
+				} else {
+					Logger.warn(`Unknown Game packet ${id}`);
+				}
 				return;
 			}
 

@@ -1,6 +1,6 @@
 import { CompressionMethod, InputMode } from "@serenityjs/protocol";
-import type { SkinData } from "./payload";
 import { DeviceOS } from "../../types";
+import type { SkinData } from "./payload";
 
 type LoginPacketOptions = {
 	/** Device Model (Can be any string) */
@@ -44,6 +44,8 @@ export type ClientOptions = {
 	compressionThreshold: number;
 	/** Compression Method for the compressor to use. */
 	compressionMethod: CompressionMethod;
+	/** Whether to emit unknown packets as buffer */
+	emitUnknownPackets: boolean,
 };
 
 /** Default Client Options */
@@ -86,4 +88,6 @@ export const defaultClientOptions: ClientOptions = {
 	compressionThreshold: 1,
 	/** Default Value: Zlib */
 	compressionMethod: CompressionMethod.Zlib,
+	/** Default Value: false */
+	emitUnknownPackets: false
 };
