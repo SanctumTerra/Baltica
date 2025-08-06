@@ -7,6 +7,7 @@ export enum ProtocolList {
 	"1.21.80" = 800,
 	"1.21.90" = 818,
 	"1.21.93" = 819,
+	"1.21.100" = 827,
 }
 
 export enum DeviceOS {
@@ -39,8 +40,8 @@ export type PacketNames = {
 /**
  * We do not have multi protocol as of now (Not yet planned either).
  */
-export type CurrentVersion = "1.21.93";
-export const CurrentVersionConst: CurrentVersion = "1.21.93";
+export type CurrentVersion = "1.21.100";
+export const CurrentVersionConst: CurrentVersion = "1.21.100";
 
 /**
  * Checks if client version is higher than the specified version
