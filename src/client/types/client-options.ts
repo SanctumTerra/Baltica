@@ -45,7 +45,7 @@ export type ClientOptions = {
 	/** Compression Method for the compressor to use. */
 	compressionMethod: CompressionMethod;
 	/** Whether to emit unknown packets as buffer */
-	emitUnknownPackets: boolean,
+	emitUnknownPackets: boolean;
 };
 
 /** Default Client Options */
@@ -89,5 +89,5 @@ export const defaultClientOptions: ClientOptions = {
 	/** Default Value: Zlib */
 	compressionMethod: CompressionMethod.Zlib,
 	/** Default Value: false */
-	emitUnknownPackets: false
+	emitUnknownPackets: false,
 };

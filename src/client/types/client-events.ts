@@ -12,7 +12,7 @@ type ClientEvents = {
 } & {
 	// 0 - 255 : [buffer: Buffer]
 	// 256 - 65535 : [buffer: Buffer]
-	[K in `${number}`]: [buffer: Buffer]
+	[K in `${number}`]: [buffer: Buffer];
 };
 
 export type { ClientEvents, PacketNames };

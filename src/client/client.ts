@@ -222,8 +222,10 @@ export class Client extends Emitter<ClientEvents> {
 		this.once("ResourcePacksInfoPacket", (packet) => {
 			if (this.cancelPastLogin) return;
 			const response = new ResourcePackClientResponsePacket();
-			
-			response.packs = packet.packs.map((p) => new RequestedResourcePack(p.uuid, p.version)); 
+
+			response.packs = packet.packs.map(
+				(p) => new RequestedResourcePack(p.uuid, p.version),
+			);
 			response.response = ResourcePackResponse.HaveAllPacks;
 			this.send(response);
 
@@ -236,7 +238,9 @@ export class Client extends Emitter<ClientEvents> {
 
 		this.once("ResourcePackStackPacket", (packet) => {
 			const response = new ResourcePackClientResponsePacket();
-			response.packs = packet.texturePacks.map((p) => new RequestedResourcePack(p.uuid, p.version)); 
+			response.packs = packet.texturePacks.map(
+				(p) => new RequestedResourcePack(p.uuid, p.version),
+			);
 			response.response = ResourcePackResponse.Completed;
 			this.send(response);
 		});
