@@ -1,5 +1,5 @@
-import { CurrentVersionConst, DeviceOS } from "../../types";
 import type { Client } from "../";
+import { CurrentVersionConst, DeviceOS } from "../../types";
 import { ClientData } from "./client-data";
 
 import type {

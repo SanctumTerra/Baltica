@@ -5,10 +5,10 @@ import {
 	Packets,
 	PlayStatus,
 } from "@serenityjs/protocol";
-import type { Player } from "../server";
 import { Client } from "../client";
-import type { Bridge } from "./bridge";
 import { Emitter } from "../libs";
+import type { Player } from "../server";
+import type { Bridge } from "./bridge";
 import type { BridgePlayerEvents } from "./types";
 
 export class BridgePlayer extends Emitter<BridgePlayerEvents> {

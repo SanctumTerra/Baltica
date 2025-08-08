@@ -1,5 +1,5 @@
-import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { CompressionMethod, Framer } from "@serenityjs/protocol";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import type { Client } from "../client/client";
 import type { Player } from "../server";
 

@@ -5,22 +5,6 @@ import {
 	Priority,
 	Status,
 } from "@sanctumterra/raknet";
-import type { Server } from "./server";
-import {
-	decodeLoginJWT,
-	Emitter,
-	PacketCompressor,
-	PacketEncryptor,
-} from "../libs";
-import {
-	type ClientOptions,
-	defaultClientOptions,
-	type PacketNames,
-	type Payload,
-	ClientData,
-	type LoginData,
-	prepareLoginData,
-} from "../client";
 import {
 	DataPacket,
 	getPacketId,
@@ -31,10 +15,26 @@ import {
 	PlayStatusPacket,
 	ServerToClientHandshakePacket,
 } from "@serenityjs/protocol";
-import type { PlayerEvents } from "./types";
-import { CurrentVersionConst } from "../types";
-import { createHash, createPublicKey } from "node:crypto";
 import * as jose from "jose";
+import { createHash, createPublicKey } from "node:crypto";
+import {
+	ClientData,
+	type ClientOptions,
+	defaultClientOptions,
+	type LoginData,
+	type PacketNames,
+	type Payload,
+	prepareLoginData,
+} from "../client";
+import {
+	decodeLoginJWT,
+	Emitter,
+	PacketCompressor,
+	PacketEncryptor,
+} from "../libs";
+import { CurrentVersionConst } from "../types";
+import type { Server } from "./server";
+import type { PlayerEvents } from "./types";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);

@@ -1,11 +1,12 @@
-import type { Worker } from "node:worker_threads";
 import {
+	type Advertisement,
 	type ClientEvents,
 	type ClientOptions,
+	defaultClientOptions,
 	type Frame,
 	Priority,
 } from "@sanctumterra/raknet";
-import { type Advertisement, defaultClientOptions } from "@sanctumterra/raknet";
+import type { Worker } from "node:worker_threads";
 import { Emitter } from "../../libs/emitter";
 import { connect } from "./worker";
 

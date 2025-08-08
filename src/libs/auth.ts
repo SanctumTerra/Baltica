@@ -1,11 +1,11 @@
-import { createPublicKey } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
 import type { LoginTokens } from "@serenityjs/protocol";
 import * as jose from "jose";
+import { createPublicKey } from "node:crypto";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
-import type { Client } from "../client/client";
 import { type ProtocolList, versionHigherThan } from "../";
+import type { Client } from "../client/client";
 
 export interface Profile {
 	name: string;
@@ -258,9 +258,9 @@ function generateUUID(username: string): string {
 }
 
 export {
-	createOfflineSession,
-	setupClientProfile,
-	generateUUID,
 	authenticate,
+	createOfflineSession,
 	decodeLoginJWT,
+	generateUUID,
+	setupClientProfile,
 };

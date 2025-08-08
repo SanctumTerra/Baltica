@@ -1,8 +1,8 @@
-import { IdentityData, LoginPacket, LoginTokens } from "@serenityjs/protocol";
-import { v3 as uuidv3 } from "uuid-1345";
-import * as jose from "jose";
-import { createECDH, KeyObject, type KeyExportOptions } from "node:crypto";
 import { Logger } from "@sanctumterra/raknet";
+import { IdentityData, LoginPacket, LoginTokens } from "@serenityjs/protocol";
+import * as jose from "jose";
+import { createECDH, type KeyExportOptions, KeyObject } from "node:crypto";
+import { v3 as uuidv3 } from "uuid-1345";
 import { type Client, createDefaultPayload, type Payload } from "../";
 import {
 	CurrentVersionConst,

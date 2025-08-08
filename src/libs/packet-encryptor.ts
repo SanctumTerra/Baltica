@@ -1,6 +1,4 @@
 import * as crypto from "node:crypto";
-import * as Zlib from "node:zlib";
-import { CompressionMethod } from "@serenityjs/protocol";
 import type { Client } from "../client/client";
 import type { Player } from "../server";
 

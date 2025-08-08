@@ -3,18 +3,18 @@ import {
 	Logger,
 	Server as RaknetServer,
 } from "@sanctumterra/raknet";
-import { Emitter } from "../libs";
-import {
-	defaultServerOptions,
-	type ServerEvents,
-	type ServerOptions,
-} from "./types";
-import { Player } from "./player";
 import {
 	DisconnectMessage,
 	DisconnectPacket,
 	DisconnectReason,
 } from "@serenityjs/protocol";
+import { Emitter } from "../libs";
+import { Player } from "./player";
+import {
+	defaultServerOptions,
+	type ServerEvents,
+	type ServerOptions,
+} from "./types";
 
 export class Server extends Emitter<ServerEvents> {
 	options: ServerOptions;

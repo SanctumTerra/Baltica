@@ -1,13 +1,13 @@
+import {
+	DisconnectMessage,
+	DisconnectPacket,
+	DisconnectReason,
+} from "@serenityjs/protocol";
 import type { ForceArray } from "../libs/emitter";
 import { type Player, Server } from "../server";
 import { BridgePlayer } from "./bridge-player";
 import { type BridgeOptions, defaultBridgeOptions } from "./types";
 import type { BridgeEvents } from "./types/bridge-events";
-import {
-	DisconnectMessage,
-	DisconnectPacket,
-	DisconnectReason,
-} from "node_modules/@serenityjs/protocol/dist";
 
 export class Bridge extends Server {
 	public options: BridgeOptions;
