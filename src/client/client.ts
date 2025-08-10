@@ -1,44 +1,44 @@
 import {
-	type Advertisement,
-	Frame,
-	Logger,
-	Priority,
-	Client as RaknetClient,
-	Status,
+   type Advertisement,
+   Frame,
+   Logger,
+   Priority,
+   Client as RaknetClient,
+   Status,
 } from "@sanctumterra/raknet";
 import {
-	ClientCacheStatusPacket,
-	ClientToServerHandshakePacket,
-	DataPacket,
-	getPacketId,
-	Packets,
-	PlayStatus,
-	RequestChunkRadiusPacket,
-	RequestedResourcePack,
-	RequestNetworkSettingsPacket,
-	ResourcePackClientResponsePacket,
-	ResourcePackResponse,
-	ResourcePacksInfoPacket,
-	ServerboundLoadingScreenPacketPacket,
-	ServerboundLoadingScreenType,
-	SetLocalPlayerAsInitializedPacket,
-	type StartGamePacket,
+   ClientCacheStatusPacket,
+   ClientToServerHandshakePacket,
+   DataPacket,
+   getPacketId,
+   Packets,
+   PlayStatus,
+   RequestChunkRadiusPacket,
+   RequestedResourcePack,
+   RequestNetworkSettingsPacket,
+   ResourcePackClientResponsePacket,
+   ResourcePackResponse,
+   ResourcePacksInfoPacket,
+   ServerboundLoadingScreenPacketPacket,
+   ServerboundLoadingScreenType,
+   SetLocalPlayerAsInitializedPacket,
+   type StartGamePacket,
 } from "@serenityjs/protocol";
 import { createHash, createPublicKey } from "node:crypto";
 import {
-	authenticate,
-	createOfflineSession,
-	Emitter,
-	PacketCompressor,
-	PacketEncryptor,
-	type Profile,
+   authenticate,
+   createOfflineSession,
+   Emitter,
+   PacketCompressor,
+   PacketEncryptor,
+   type Profile,
 } from "../libs";
 import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
 import {
-	ClientData,
-	type ClientEvents,
-	type ClientOptions,
-	defaultClientOptions,
+   ClientData,
+   type ClientEvents,
+   type ClientOptions,
+   defaultClientOptions,
 } from "./types";
 import { WorkerClient } from "./worker";
 
@@ -109,8 +109,16 @@ export class Client extends Emitter<ClientEvents> {
 	}
 
 	/** Connect to the server and start sending/receiving packets. */
-	async connect(): Promise<[Advertisement, StartGamePacket]> {
-		const advertisement = await this.raknet.connect();
+	async connect(): Promise<[Advertisement | null, StartGamePacket]> {
+		const advertisement = await this.raknet.connect().catch((error) => {
+			Logger.error("Error connecting with Raknet.", error);
+			/*
+		    An attempt to recover incase the error was not fatal.
+				If it was fatal we will get a differetnt error anyway. So dont judge me!
+			*/
+			return null;
+		});
+
 		this.status = Status.Connecting;
 		this.packetCompressor = new PacketCompressor(this);
 		this.handleGamePackets();
@@ -219,6 +227,7 @@ export class Client extends Emitter<ClientEvents> {
 			const handshake = new ClientToServerHandshakePacket();
 			this.send(handshake);
 		});
+
 		this.once("ResourcePacksInfoPacket", (packet) => {
 			if (this.cancelPastLogin) return;
 			const response = new ResourcePackClientResponsePacket();

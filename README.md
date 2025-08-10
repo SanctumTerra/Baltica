@@ -27,6 +27,7 @@ We've completely rewritten Baltica from the ground up! Here's what makes it awes
 ## 📋 Version Support
 
 `0.1.0` → Minecraft Bedrock `1.21.93`
+`0.1.7` → Minecraft Bedrock `1.21.100`
 
 *Note: We dropped multi-version support because honestly, it was more trouble than it was worth. One version, done right.*
 
@@ -123,6 +124,59 @@ bridge.on("connect", (player) => {
     signal.packet.message = `[${player.client.username}]: ${signal.packet.message}`;
     signal.modified = true; // Don't forget this!
   });
+});
+```
+
+### Using Bridge to get skinData
+
+This example shows how to obtain skinData via bridge and use it with a client.
+
+```typescript
+const bridge = new Bridge({
+	destination: {
+		address: "127.0.0.1",
+	   port: 19132,
+	},
+});
+bridge.start();
+
+bridge.on("connect", (player) => {
+   setTimeout(() => {      
+      console.log(player.player.loginPayload as SkinData);
+      writeFileSync(`${player.client.username}-skin.json`, JSON.stringify({
+         AnimatedImageData: player.player.loginPayload.AnimatedImageData,
+         ArmSize: player.player.loginPayload.ArmSize,
+         CapeData: player.player.loginPayload.CapeData,
+         CapeId: player.player.loginPayload.CapeId,
+         CapeImageHeight: player.player.loginPayload.CapeImageHeight,
+         CapeImageWidth: player.player.loginPayload.CapeImageWidth,
+         CapeOnClassicSkin: player.player.loginPayload.CapeOnClassicSkin,
+         PersonaPieces: player.player.loginPayload.PersonaPieces,
+         PersonaSkin: player.player.loginPayload.PersonaSkin,
+         SkinAnimationData: player.player.loginPayload.SkinAnimationData,
+         SkinData: player.player.loginPayload.SkinData,
+         SkinGeometryData: player.player.loginPayload.SkinGeometryData,
+         SkinGeometryDataEngineVersion: player.player.loginPayload.SkinGeometryDataEngineVersion,
+         SkinId: player.player.loginPayload.SkinId,
+         SkinImageHeight: player.player.loginPayload.SkinImageHeight,
+         SkinImageWidth: player.player.loginPayload.SkinImageWidth,
+         PieceTintColors: player.player.loginPayload.PieceTintColors,
+         PremiumSkin: player.player.loginPayload.PremiumSkin,
+         SkinColor: player.player.loginPayload.SkinColor,
+         SkinResourcePatch: player.player.loginPayload.SkinResourcePatch,
+         TrustedSkin: player.player.loginPayload.TrustedSkin,
+      } as SkinData))
+   }, 6000);
+})
+```
+
+And this is how you could apply it:
+
+```ts
+import * as skin from "username-skin.json";
+
+const client = new Client({
+   skinData: skin,
 });
 ```
 
