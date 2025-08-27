@@ -48,7 +48,7 @@ class WorkerClient extends Emitter<ClientEvents> {
     });
   }
 
-  public connect(): Promise<unknown> {
+  public connect(): Promise<Advertisement | null> {
     return new Promise((resolve, reject) => {
       if (!this._worker) {
         reject(new Error("Worker not initialized"));
