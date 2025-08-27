@@ -27,7 +27,8 @@ We've completely rewritten Baltica from the ground up! Here's what makes it awes
 ## 📋 Version Support
 
 `0.1.0` → Minecraft Bedrock `1.21.93`
-`0.1.7` → Minecraft Bedrock `1.21.100`
+`0.1.8` → Minecraft Bedrock `1.21.100` & `1.21.101`
+
 
 *Note: We dropped multi-version support because honestly, it was more trouble than it was worth. One version, done right.*
 
@@ -84,7 +85,7 @@ server.start();
 
 server.on("playerConnect", (player) => {
   console.log(`${player.username} is connecting...`);
-  
+
   player.on("login", () => {
     console.log(`Welcome ${player.username}! 🎉`);
   });
@@ -112,12 +113,12 @@ bridge.start();
 // Intercept all connections
 bridge.on("connect", (player) => {
   console.log(`Player connected through proxy: ${player.client.username}`);
-  
+
   // Listen to messages going TO the client
   player.on("clientBound-TextPacket", (signal) => {
     console.log(`Server said: ${signal.packet.message}`);
   });
-  
+
   // Modify messages coming FROM the client
   player.on("serverBound-TextPacket", (signal) => {
     // Add a fun prefix to all messages
@@ -141,7 +142,7 @@ const bridge = new Bridge({
 bridge.start();
 
 bridge.on("connect", (player) => {
-   setTimeout(() => {      
+   setTimeout(() => {
       console.log(player.player.loginPayload as SkinData);
       writeFileSync(`${player.client.username}-skin.json`, JSON.stringify({
          AnimatedImageData: player.player.loginPayload.AnimatedImageData,
