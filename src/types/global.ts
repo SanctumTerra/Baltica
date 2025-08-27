@@ -1,4 +1,4 @@
-import * as Protocol from "@serenityjs/protocol";
+import type * as Protocol from "@serenityjs/protocol";
 
 export enum ProtocolList {
   "1.21.50" = 766,
