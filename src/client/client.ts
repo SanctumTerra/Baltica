@@ -1,44 +1,43 @@
 import {
-   type Advertisement,
-   Frame,
-   Logger,
-   Priority,
-   Client as RaknetClient,
-   Status,
+	Frame,
+	Logger,
+	Priority,
+	Client as RaknetClient,
+	ConnectionStatus,
 } from "@sanctumterra/raknet";
 import {
-   ClientCacheStatusPacket,
-   ClientToServerHandshakePacket,
-   DataPacket,
-   getPacketId,
-   Packets,
-   PlayStatus,
-   RequestChunkRadiusPacket,
-   RequestedResourcePack,
-   RequestNetworkSettingsPacket,
-   ResourcePackClientResponsePacket,
-   ResourcePackResponse,
-   ResourcePacksInfoPacket,
-   ServerboundLoadingScreenPacketPacket,
-   ServerboundLoadingScreenType,
-   SetLocalPlayerAsInitializedPacket,
-   type StartGamePacket,
+	ClientCacheStatusPacket,
+	ClientToServerHandshakePacket,
+	DataPacket,
+	getPacketId,
+	Packets,
+	PlayStatus,
+	RequestChunkRadiusPacket,
+	RequestedResourcePack,
+	RequestNetworkSettingsPacket,
+	ResourcePackClientResponsePacket,
+	ResourcePackResponse,
+	ResourcePacksInfoPacket,
+	ServerboundLoadingScreenPacketPacket,
+	ServerboundLoadingScreenType,
+	SetLocalPlayerAsInitializedPacket,
+	type StartGamePacket,
 } from "@serenityjs/protocol";
 import { createHash, createPublicKey } from "node:crypto";
 import {
-   authenticate,
-   createOfflineSession,
-   Emitter,
-   PacketCompressor,
-   PacketEncryptor,
-   type Profile,
+	authenticate,
+	createOfflineSession,
+	Emitter,
+	PacketCompressor,
+	PacketEncryptor,
+	type Profile,
 } from "../libs";
 import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
 import {
-   ClientData,
-   type ClientEvents,
-   type ClientOptions,
-   defaultClientOptions,
+	ClientData,
+	type ClientEvents,
+	type ClientOptions,
+	defaultClientOptions,
 } from "./types";
 import { WorkerClient } from "./worker";
 
@@ -60,7 +59,7 @@ export class Client extends Emitter<ClientEvents> {
 	/** Client Data for auth and login. */
 	data!: ClientData;
 	/** Client status in this attempted connection */
-	status: Status;
+	status: ConnectionStatus;
 	/** Packet Compression (class for simplicfication) */
 	packetCompressor!: PacketCompressor;
 	/** Packet Encryptor (class for simplification) */
@@ -85,7 +84,7 @@ export class Client extends Emitter<ClientEvents> {
 		this._compressionEnabled = false;
 		this._encryptionEnabled = false;
 		/** Client status */
-		this.status = Status.Disconnected;
+		this.status = ConnectionStatus.Disconnected;
 		/** worker or not. */
 		this.raknet = this.options.worker
 			? new WorkerClient({
@@ -109,17 +108,10 @@ export class Client extends Emitter<ClientEvents> {
 	}
 
 	/** Connect to the server and start sending/receiving packets. */
-	async connect(): Promise<[Advertisement | null, StartGamePacket]> {
-		const advertisement = await this.raknet.connect().catch((error) => {
-			Logger.error("Error connecting with Raknet.", error);
-			/*
-		    An attempt to recover incase the error was not fatal.
-				If it was fatal we will get a differetnt error anyway. So dont judge me!
-			*/
-			return null;
-		});
+	async connect(): Promise<[StartGamePacket]> {
+		await this.raknet.connect();
 
-		this.status = Status.Connecting;
+		this.status = ConnectionStatus.Connecting;
 		this.packetCompressor = new PacketCompressor(this);
 		this.handleGamePackets();
 
@@ -130,7 +122,7 @@ export class Client extends Emitter<ClientEvents> {
 
 		return new Promise((resolve, rejevt) => {
 			this.once("SetLocalPlayerAsInitializedPacket", (packet) => {
-				resolve([advertisement, this.startGameData]);
+				resolve([this.startGameData]);
 			});
 		});
 	}
@@ -151,7 +143,6 @@ export class Client extends Emitter<ClientEvents> {
 	public processPacket(buffer: Buffer): void {
 		const id = getPacketId(buffer);
 		const PacketClass = Packets[id];
-
 		try {
 			if (!PacketClass || !PacketClass.name) {
 				if (this.options.emitUnknownPackets) {
@@ -197,6 +188,7 @@ export class Client extends Emitter<ClientEvents> {
 			const loginPacket = this.data.createLoginPacket();
 			this.send(loginPacket);
 		});
+
 		this.once("ServerToClientHandshakePacket", (packet) => {
 			const [header, payload] = packet.token
 				.split(".")
@@ -279,7 +271,7 @@ export class Client extends Emitter<ClientEvents> {
 			}
 		});
 		this.on("DisconnectPacket", (packet) => {
-			this.status = Status.Disconnected;
+			this.status = ConnectionStatus.Disconnected;
 			this.raknet.disconnect();
 			console.log(packet.message);
 		});
@@ -298,10 +290,10 @@ export class Client extends Emitter<ClientEvents> {
 
 	private sendPacket(
 		packet: DataPacket | Buffer,
-		priority: Priority = Priority.Normal,
+		priority: Priority = Priority.High,
 	): void {
 		try {
-			if (this.status === Status.Disconnected) return;
+			if (this.status === ConnectionStatus.Disconnected) return;
 
 			const serialized =
 				packet instanceof DataPacket ? packet.serialize() : packet;
@@ -310,10 +302,7 @@ export class Client extends Emitter<ClientEvents> {
 				this.options.compressionMethod,
 			);
 
-			const frame = new Frame();
-			frame.orderChannel = 0;
-			frame.payload = compressed;
-			this.raknet.sendFrame(frame, priority);
+			this.raknet.frameAndSend(compressed, priority);
 		} catch (error) {
 			Logger.error(
 				`Failed to send packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
@@ -323,13 +312,13 @@ export class Client extends Emitter<ClientEvents> {
 	}
 
 	public send(packet: DataPacket | Buffer): void {
-		this.sendPacket(packet, Priority.Immediate);
+		this.sendPacket(packet, Priority.High);
 	}
 
 	public queue(packet: DataPacket | Buffer): void {
 		Logger.debug(
 			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
 		);
-		this.sendPacket(packet, Priority.Normal);
+		this.sendPacket(packet, Priority.High);
 	}
 }

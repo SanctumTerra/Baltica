@@ -27,9 +27,9 @@ export class Bridge extends Server {
 		this.on("playerConnect", (player: Player) => {
 			const bridgePlayer = new BridgePlayer(player, this);
 			console.log(
-				`Player ${player.connection.remoteInfo.address} connected to bridge`,
+				`Player ${player.connection.getAddress().address} connected to bridge`,
 			);
-			const key = `${player.connection.remoteInfo.address}:${player.connection.remoteInfo.port}`;
+			const key = `${player.connection.getAddress().address}:${player.connection.getAddress().port}`;
 			this.clients.set(key, bridgePlayer);
 			this.emit("connect", bridgePlayer);
 		});
@@ -43,7 +43,7 @@ export class Bridge extends Server {
 		disconnect.reason = DisconnectReason.LegacyDisconnect;
 		player.client.send(disconnect.serialize());
 		this.emit("disconnect", player);
-		const key = `${player.player.connection.remoteInfo.address}:${player.player.connection.remoteInfo.port}`;
+		const key = `${player.player.connection.getAddress().address}:${player.player.connection.getAddress().port}`;
 		this.clients.delete(key);
 		this.onDisconnect(player.player);
 	}

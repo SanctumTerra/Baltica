@@ -25,7 +25,7 @@ export class Server extends Emitter<ServerEvents> {
 		super();
 		this.options = { ...defaultServerOptions, ...options };
 		this.raknet = new RaknetServer({
-			host: this.options.address,
+			address: this.options.address,
 			port: this.options.port,
 			motd: this.options.motd,
 			tickRate: this.options.tickRate,
@@ -62,7 +62,7 @@ export class Server extends Emitter<ServerEvents> {
 			const { address, port } = connection.getAddress();
 			Logger.info(`Session received from: ${address}:${port}`);
 		});
-		this.raknet.start();
+		this.raknet.listen();
 	}
 
 	public onDisconnect(player: Player) {

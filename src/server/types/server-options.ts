@@ -40,4 +40,4 @@ export const defaultServerOptions: ServerOptions = {
 	compressionMethod: CompressionMethod.Zlib,
 	/** Compression Threshold */
 	compressionThreshold: 1,
-};
+} as const;

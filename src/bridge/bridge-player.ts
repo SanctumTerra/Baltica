@@ -56,7 +56,7 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 		this.on("serverBound-DisconnectPacket", (signal) =>
 			this.bridge.disconnect(this),
 		);
-		this.player.connection.on("disconnect", () => this.bridge.disconnect(this));
+		this.bridge.on("disconnect", () => this.bridge.disconnect(this));
 		this.client.connect();
 	}
 

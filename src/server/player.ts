@@ -3,7 +3,7 @@ import {
 	Frame,
 	Logger,
 	Priority,
-	Status,
+	ConnectionStatus,
 } from "@sanctumterra/raknet";
 import {
 	DataPacket,
@@ -46,7 +46,7 @@ export class Player extends Emitter<PlayerEvents> {
 	_encryptionEnabled: boolean;
 	iv!: Buffer;
 	secretKeyBytes!: Buffer;
-	status: Status = Status.Disconnected;
+	status: ConnectionStatus = ConnectionStatus.Disconnected;
 	loginData!: LoginData;
 	sharedSecret!: Buffer;
 
@@ -108,10 +108,10 @@ export class Player extends Emitter<PlayerEvents> {
 
 	private sendPacket(
 		packet: DataPacket | Buffer,
-		priority: Priority = Priority.Normal,
+		priority: Priority = Priority.High,
 	): void {
 		try {
-			if (this.status === Status.Disconnected) return;
+			if (this.status === ConnectionStatus.Disconnected) return;
 
 			const serialized =
 				packet instanceof DataPacket ? packet.serialize() : packet;
@@ -133,14 +133,14 @@ export class Player extends Emitter<PlayerEvents> {
 	}
 
 	public send(packet: DataPacket | Buffer): void {
-		this.sendPacket(packet, Priority.Immediate);
+		this.sendPacket(packet, Priority.High);
 	}
 
 	public queue(packet: DataPacket | Buffer): void {
 		Logger.debug(
 			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
 		);
-		this.sendPacket(packet, Priority.Normal);
+		this.sendPacket(packet, Priority.Medium);
 	}
 
 	public startEncryption(iv: Buffer) {
@@ -156,7 +156,7 @@ export class Player extends Emitter<PlayerEvents> {
 		// this.packetEncryptor = new PacketEncryptor(this);
 		this.connection.on("encapsulated", this.onEncapsulated.bind(this));
 		this.on("RequestNetworkSettingsPacket", (packet) => {
-			this.status = Status.Connecting;
+			this.status = ConnectionStatus.Connecting;
 			const settings = new NetworkSettingsPacket();
 			settings.compressionThreshold = this.server.options.compressionThreshold;
 			settings.clientScalar = 0;

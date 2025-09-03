@@ -27,6 +27,7 @@ We've completely rewritten Baltica from the ground up! Here's what makes it awes
 ## 📋 Version Support
 
 `0.1.0` → Minecraft Bedrock `1.21.93`
+
 `0.1.8` → Minecraft Bedrock `1.21.100` & `1.21.101`
 
 
