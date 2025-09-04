@@ -26,10 +26,7 @@ import {
 	type Payload,
 	prepareLoginData,
 } from "../client/types";
-import {
-	PacketCompressor,
-	PacketEncryptor,
-} from "../shared";
+import { PacketCompressor, PacketEncryptor } from "../shared";
 import { CurrentVersionConst } from "../shared/types";
 import type { Server } from "./server";
 import type { PlayerEvents } from "./types";

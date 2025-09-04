@@ -32,9 +32,13 @@ import {
 	Emitter,
 	PacketCompressor,
 	PacketEncryptor,
-	Profile,
+	type Profile,
 } from "../shared";
-import { CurrentVersionConst, type PacketNames, ProtocolList } from "../shared/types";
+import {
+	CurrentVersionConst,
+	type PacketNames,
+	ProtocolList,
+} from "../shared/types";
 import {
 	ClientData,
 	type ClientEvents,
