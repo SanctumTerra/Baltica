@@ -1,5 +1,5 @@
 import type * as Protocol from "@serenityjs/protocol";
-import type { PacketNames } from "../../types";
+import type { PacketNames } from "../../shared/types";
 
 export type PlayerEvents = {
 	[K in PacketNames]: [packet: InstanceType<(typeof Protocol)[K]>];

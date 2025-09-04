@@ -4,7 +4,7 @@ import * as jose from "jose";
 import { createECDH, type KeyExportOptions, KeyObject } from "node:crypto";
 import { v3 as uuidv3 } from "uuid-1345";
 import { type Client, createDefaultPayload, type Payload } from "../";
-import { CurrentVersionConst, ProtocolList } from "../../types";
+import { CurrentVersionConst, ProtocolList } from "../../shared/types";
 import { type LoginData, prepareLoginData } from "./login-data";
 
 const PUBLIC_KEY =

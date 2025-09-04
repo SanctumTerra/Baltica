@@ -25,16 +25,15 @@ import {
 	type PacketNames,
 	type Payload,
 	prepareLoginData,
-} from "../client";
+} from "../client/types";
 import {
-	decodeLoginJWT,
-	Emitter,
 	PacketCompressor,
 	PacketEncryptor,
-} from "../libs";
-import { CurrentVersionConst } from "../types";
+} from "../shared";
+import { CurrentVersionConst } from "../shared/types";
 import type { Server } from "./server";
 import type { PlayerEvents } from "./types";
+import { decodeLoginJWT, Emitter } from "../shared";
 
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);

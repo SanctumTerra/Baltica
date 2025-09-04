@@ -1,9 +1,11 @@
+import { createHash, createPublicKey } from "node:crypto";
+
 import {
+	Client as RaknetClient,
+	ConnectionStatus,
 	Frame,
 	Logger,
 	Priority,
-	Client as RaknetClient,
-	ConnectionStatus,
 } from "@sanctumterra/raknet";
 import {
 	ClientCacheStatusPacket,
@@ -13,8 +15,8 @@ import {
 	Packets,
 	PlayStatus,
 	RequestChunkRadiusPacket,
-	RequestedResourcePack,
 	RequestNetworkSettingsPacket,
+	RequestedResourcePack,
 	ResourcePackClientResponsePacket,
 	ResourcePackResponse,
 	ResourcePacksInfoPacket,
@@ -23,16 +25,16 @@ import {
 	SetLocalPlayerAsInitializedPacket,
 	type StartGamePacket,
 } from "@serenityjs/protocol";
-import { createHash, createPublicKey } from "node:crypto";
+
 import {
 	authenticate,
 	createOfflineSession,
 	Emitter,
 	PacketCompressor,
 	PacketEncryptor,
-	type Profile,
-} from "../libs";
-import { CurrentVersionConst, type PacketNames, ProtocolList } from "../types";
+	Profile,
+} from "../shared";
+import { CurrentVersionConst, type PacketNames, ProtocolList } from "../shared/types";
 import {
 	ClientData,
 	type ClientEvents,

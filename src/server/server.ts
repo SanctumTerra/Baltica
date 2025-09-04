@@ -8,13 +8,13 @@ import {
 	DisconnectPacket,
 	DisconnectReason,
 } from "@serenityjs/protocol";
-import { Emitter } from "../libs";
 import { Player } from "./player";
 import {
 	defaultServerOptions,
 	type ServerEvents,
 	type ServerOptions,
 } from "./types";
+import { Emitter } from "src/shared";
 
 export class Server extends Emitter<ServerEvents> {
 	options: ServerOptions;

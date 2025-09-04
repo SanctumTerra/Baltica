@@ -6,10 +6,10 @@ import {
 	PlayStatus,
 } from "@serenityjs/protocol";
 import { Client } from "../client";
-import { Emitter } from "../libs";
 import type { Player } from "../server";
 import type { Bridge } from "./bridge";
 import type { BridgePlayerEvents } from "./types";
+import { Emitter } from "../shared";
 
 export class BridgePlayer extends Emitter<BridgePlayerEvents> {
 	public bridge: Bridge;

@@ -3,7 +3,7 @@ import {
 	DisconnectPacket,
 	DisconnectReason,
 } from "@serenityjs/protocol";
-import type { ForceArray } from "../libs/emitter";
+import type { ForceArray } from "../shared/emitter";
 import { type Player, Server } from "../server";
 import { BridgePlayer } from "./bridge-player";
 import { type BridgeOptions, defaultBridgeOptions } from "./types";

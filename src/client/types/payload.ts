@@ -1,6 +1,6 @@
 import { DeviceOS } from "@serenityjs/protocol";
 import type { Client } from "../";
-import { CurrentVersionConst } from "../../types";
+import { CurrentVersionConst } from "../../shared/types";
 import { ClientData } from "./client-data";
 
 import type {

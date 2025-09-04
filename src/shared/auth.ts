@@ -4,7 +4,7 @@ import * as jose from "jose";
 import { createPublicKey } from "node:crypto";
 import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
-import { type ProtocolList, versionHigherThan } from "../";
+import { type ProtocolList, versionHigherThan } from "./types";
 import type { Client } from "../client/client";
 
 export interface Profile {

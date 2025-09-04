@@ -1,6 +1,6 @@
 import { Advertisement } from "@sanctumterra/raknet";
 import type * as Protocol from "@serenityjs/protocol";
-import type { PacketNames } from "../../types";
+import type { PacketNames } from "../../shared/types";
 
 export type BridgeEventSignal = {
 	packet: InstanceType<(typeof Protocol)[PacketNames]>;
