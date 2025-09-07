@@ -7,9 +7,11 @@ on:
 
 jobs:
   lint:
+    name: Lint Code
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -20,6 +22,7 @@ jobs:
         run: npm run lint
 
   build:
+    name: Build Package
     needs: [lint]    
     permissions:
       id-token: write
@@ -45,41 +48,30 @@ jobs:
             package.json
             package-lock.json
 
-  publish-and-release:
+  create-release:
+    name: Create GitHub Release
     needs: [build]
     permissions:
-      id-token: write
       contents: write
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package-info.outputs.version }}
+      minecraft: ${{ steps.package-info.outputs.minecraft }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for git log
+          fetch-depth: 0  
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
-      - name: Check if package can be published
-        run: npm publish --dry-run --verbose
-      - name: Publish package
-        id: npm-publish
-        run: npm publish --access=public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Get version and Minecraft info
-        if: success()
         id: package-info
         run: |
           echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           echo "minecraft=$(node -p "require('./package.json').minecraft")" >> $GITHUB_OUTPUT
       - name: Generate release notes
-        if: success()
         id: release-notes
         run: |
           # Get the latest release tag (if any)
@@ -110,39 +102,7 @@ jobs:
           fi
           
           RELEASE_NOTES="$RELEASE_NOTES
-          $COMMITS
-          
-          ## Contributors"
-          
-          # Add contributors list
-          if [ -z "$COMMIT_RANGE" ]; then
-            CONTRIBUTORS=$(git log --pretty=format:"%an <%ae>" | sort | uniq | while read line; do
-              name=$(echo "$line" | sed 's/ <.*//')
-              email=$(echo "$line" | sed 's/.*<//' | sed 's/>//')
-              if [[ "$email" == *"@users.noreply.github.com" ]]; then
-                # Extract GitHub username from noreply email
-                github_user=$(echo "$email" | sed 's/.*+//' | sed 's/@users.noreply.github.com//')
-                echo "- $name (@$github_user)"
-              else
-                echo "- $name <$email>"
-              fi
-            done)
-          else
-            CONTRIBUTORS=$(git log ${COMMIT_RANGE} --pretty=format:"%an <%ae>" | sort | uniq | while read line; do
-              name=$(echo "$line" | sed 's/ <.*//')
-              email=$(echo "$line" | sed 's/.*<//' | sed 's/>//')
-              if [[ "$email" == *"@users.noreply.github.com" ]]; then
-                # Extract GitHub username from noreply email
-                github_user=$(echo "$email" | sed 's/.*+//' | sed 's/@users.noreply.github.com//')
-                echo "- $name (@$github_user)"
-              else
-                echo "- $name <$email>"
-              fi
-            done)
-          fi
-          
-          RELEASE_NOTES="$RELEASE_NOTES
-          $CONTRIBUTORS"
+          $COMMITS"
           
           # Set the release notes as output (escaped for GitHub Actions)
           {
@@ -151,7 +111,6 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
       - name: Create Release
-        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -159,3 +118,51 @@ jobs:
             --title "Release v${{ steps.package-info.outputs.version }} for Minecraft Bedrock ${{ steps.package-info.outputs.minecraft }}" \
             --notes "${{ steps.release-notes.outputs.notes }}" \
             --target ${{ github.sha }}
+
+  npm-publish:
+    name: Publish to NPM
+    needs: [create-release]
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Check if package can be published
+        run: npm publish --dry-run --verbose
+      - name: Publish package
+        run: npm publish --access=public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  discord-webhook:
+    name: Send Discord Notification
+    needs: [npm-publish, create-release]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+      - name: Create release archive
+        run: |
+          tar -czf baltica-v${{ needs.create-release.outputs.version }}.tar.gz dist/ package.json
+          zip -r baltica-v${{ needs.create-release.outputs.version }}.zip dist/ package.json
+      - name: Send Discord notification
+        run: |
+          curl -H "Content-Type: multipart/form-data" \
+            -F "payload_json={\"content\":\"**🚀 Baltica v${{ needs.create-release.outputs.version }} Released for Minecraft ${{ needs.create-release.outputs.minecraft }}!**\n\n📦 **Quick Install:**\n\`\`\`bash\nnpm install baltica\n# or version specific\nnpm install baltica@${{ needs.create-release.outputs.version }}\n\`\`\`\n\n🔗 **Links:**\n• [GitHub Release](https://github.com/SanctumTerra/Baltica/releases/tag/v${{ needs.create-release.outputs.version }})\n• [NPM Package](https://www.npmjs.com/package/baltica)\n\n✨ Ready to build amazing Minecraft Bedrock experiences!\"}" \
+            -F "file1=@baltica-v${{ needs.create-release.outputs.version }}.tar.gz" \
+            -F "file2=@baltica-v${{ needs.create-release.outputs.version }}.zip" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
