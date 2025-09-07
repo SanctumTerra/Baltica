@@ -14,7 +14,7 @@ import {
 	type ServerEvents,
 	type ServerOptions,
 } from "./types";
-import { Emitter } from "src/shared";
+import { Emitter } from "../shared";
 
 export class Server extends Emitter<ServerEvents> {
 	options: ServerOptions;
