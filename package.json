@@ -1,7 +1,7 @@
 {
   "name": "baltica",
   "description": "Library for Minecraft Bedrock Edition community developers.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "minecraft": "1.21.100",
   "main": "dist/index.js",
   "license": "MIT",
