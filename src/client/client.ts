@@ -47,6 +47,15 @@ import {
 } from "./types";
 import { WorkerClient } from "./worker";
 
+/**
+ * Client class represents a Minecraft Bedrock Edition client.
+ * It handles connection, authentication, packet processing, encryption, and communication with the server.
+ * It supports both online and offline modes, as well as worker threads for networking.
+ * It emits various events for packet handling and connection status changes.
+ * It does not handle game logic; that is left to the user of the class.
+ * It is designed to be extensible and customizable through options and event listeners.
+ * Thanks for reading my yap session. :)
+ */
 export class Client extends Emitter<ClientEvents> {
 	/** Client Options that change decisions duh. */
 	options: ClientOptions;
@@ -294,6 +303,11 @@ export class Client extends Emitter<ClientEvents> {
 		}
 	}
 
+	/**
+	 * Sends Packets to the server.
+	 * 
+	 * Please use send for important packets and queue for less important packets.
+	 */
 	private sendPacket(
 		packet: DataPacket | Buffer,
 		priority: Priority = Priority.High,

@@ -12,15 +12,15 @@
 
 ## 🚀 What's New in v0.1.0
 
-We've completely rewritten Baltica from the ground up! Here's what makes it awesome:
+Complete rewrite, from the ground up! Here's what makes it awesome:
 
-**⚡ Lightning Fast Performance** - We obsessed over every millisecond to make this as snappy as possible
+- **Lightning Fast Performance** - We obsessed over every millisecond to make this as snappy as possible.
 
-**🎯 Full TypeScript Support** - Proper types everywhere, so your IDE will actually help you instead of fighting you
+- **Full TypeScript Support** - Proper types everywhere, so your IDE will actually help you instead of fighting you.
 
-**🔧 Zero Maintenance Headaches** - Built on top of solid libraries like `@serenityjs/protocol` and `@serenityjs/binarystream` so we don't have to reinvent the wheel
+- **Zero Maintenance Headaches** - Built on top of solid libraries like `@serenityjs/protocol` and `@serenityjs/binarystream` so we don't have to reinvent the wheel.
 
-**🎪 Triple Threat** - Three tools in one package: Server, Client, and Bridge (MITM Proxy)
+- **Three-in-one** - Three tools in one package: Server, Client, and Bridge (MITM Proxy)
 
 ---
 

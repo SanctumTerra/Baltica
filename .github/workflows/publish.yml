@@ -162,7 +162,7 @@ jobs:
       - name: Send Discord notification
         run: |
           curl -H "Content-Type: multipart/form-data" \
-            -F "payload_json={\"content\":\"**🚀 Baltica v${{ needs.create-release.outputs.version }} Released for Minecraft ${{ needs.create-release.outputs.minecraft }}!**\n\n📦 **Quick Install:**\n\`\`\`bash\nnpm install baltica\n# or version specific\nnpm install baltica@${{ needs.create-release.outputs.version }}\n\`\`\`\n\n🔗 **Links:**\n• [GitHub Release](https://github.com/SanctumTerra/Baltica/releases/tag/v${{ needs.create-release.outputs.version }})\n• [NPM Package](https://www.npmjs.com/package/baltica)\n\n✨ Ready to build amazing Minecraft Bedrock experiences!\"}" \
+            -F "payload_json={\"content\":\"**🚀 Baltica v${{ needs.create-release.outputs.version }} Released for Minecraft ${{ needs.create-release.outputs.minecraft }}!**\n\n📦 **Quick Install:**\n\`\`\`bash\nnpm install baltica\n# or version specific\nnpm install baltica@${{ needs.create-release.outputs.version }}\n\`\`\`\n\n🔗 **Links:**\n• [GitHub Release](<https://github.com/SanctumTerra/Baltica/releases/tag/v${{ needs.create-release.outputs.version }}>)\n• [NPM Package](<https://www.npmjs.com/package/baltica>)\n\nAdditional source files attached below.!\"}" \
             -F "file1=@baltica-v${{ needs.create-release.outputs.version }}.tar.gz" \
             -F "file2=@baltica-v${{ needs.create-release.outputs.version }}.zip" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}

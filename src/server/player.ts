@@ -32,9 +32,17 @@ import type { Server } from "./server";
 import type { PlayerEvents } from "./types";
 import { decodeLoginJWT, Emitter } from "../shared";
 
+/**
+ * Note: The salt has to be same as for the client, otherwise authentication will fail.
+ * It is currently "🧂" (U+1F9C2) for both Bedrock Dedicated Server and the official client.
+ */
 const SALT = "🧂";
 const SALT_BUFFER = Buffer.from(SALT);
 
+/**
+ * Player class represents a connected player on the server.
+ * It handles packet processing, encryption, and communication with the client.
+ */
 export class Player extends Emitter<PlayerEvents> {
 	packetCompressor!: PacketCompressor;
 	packetEncryptor!: PacketEncryptor;
@@ -128,17 +136,29 @@ export class Player extends Emitter<PlayerEvents> {
 		}
 	}
 
+	/**
+	 * Sends a packet to the client with High priority.
+	 */
 	public send(packet: DataPacket | Buffer): void {
 		this.sendPacket(packet, Priority.High);
 	}
 
+	/**
+	 * Sends a packet to the client with Medium priority. 
+	 * 
+	 * Aka "queueing" the packet.
+	 */
 	public queue(packet: DataPacket | Buffer): void {
 		Logger.debug(
 			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
 		);
 		this.sendPacket(packet, Priority.Medium);
 	}
-
+	/**
+	 *  Starts encryption for the connection using the provided IV.
+	 *  If encryption is already enabled, it will not reinitialize it.
+	 *  If you do not know what you are doing, do not call this method manually.
+	 */
 	public startEncryption(iv: Buffer) {
 		if (!this.packetEncryptor) {
 			this.packetEncryptor = new PacketEncryptor(this, iv);
