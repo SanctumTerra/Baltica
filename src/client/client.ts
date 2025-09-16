@@ -305,7 +305,7 @@ export class Client extends Emitter<ClientEvents> {
 
 	/**
 	 * Sends Packets to the server.
-	 * 
+	 *
 	 * Please use send for important packets and queue for less important packets.
 	 */
 	private sendPacket(

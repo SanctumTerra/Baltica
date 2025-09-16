@@ -144,8 +144,8 @@ export class Player extends Emitter<PlayerEvents> {
 	}
 
 	/**
-	 * Sends a packet to the client with Medium priority. 
-	 * 
+	 * Sends a packet to the client with Medium priority.
+	 *
 	 * Aka "queueing" the packet.
 	 */
 	public queue(packet: DataPacket | Buffer): void {
