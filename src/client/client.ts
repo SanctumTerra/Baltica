@@ -137,6 +137,7 @@ export class Client extends Emitter<ClientEvents> {
 
 		return new Promise((resolve, rejevt) => {
 			this.once("SetLocalPlayerAsInitializedPacket", (packet) => {
+				this.emit("connect");
 				resolve([this.startGameData]);
 			});
 		});

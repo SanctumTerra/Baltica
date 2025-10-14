@@ -8,7 +8,7 @@ type ClientEvents = {
 	session: [];
 } & {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
-	connect: [packet: Advertisement];
+	connect: [];
 } & {
 	// 0 - 255 : [buffer: Buffer]
 	// 256 - 65535 : [buffer: Buffer]
