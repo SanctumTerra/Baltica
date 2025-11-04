@@ -23,7 +23,7 @@
   "dependencies": {
     "@sanctumterra/raknet": "^1.4.0",
     "@serenityjs/binarystream": "^3.0.10",
-    "@serenityjs/protocol": "^0.8.7",
+    "@serenityjs/protocol": "^0.8.14",
     "jose": "^5.10.0",
     "prismarine-auth": "^2.7.0",
     "uuid-1345": "^1.0.2"

@@ -107,11 +107,11 @@ class ClientData {
 			...customPayload,
 			ServerAddress: `${this.client.options.address}:${this.client.options.port}`,
 			ClientRandomId: Date.now(),
-			DeviceId: ClientData.nextUUID(this.client.profile?.name),
-			PlayFabId: ClientData.nextUUID(this.client.profile?.name)
+			DeviceId: ClientData.nextUUID(this.client.profile.name),
+			PlayFabId: ClientData.nextUUID(this.client.profile.name)
 				.replace(/-/g, "")
 				.slice(0, 16),
-			SelfSignedId: ClientData.nextUUID(this.client.profile?.name),
+			SelfSignedId: ClientData.nextUUID(this.client.profile.name),
 		};
 
 		const josePrivateKey = await jose.importPKCS8(
