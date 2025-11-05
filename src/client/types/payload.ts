@@ -110,11 +110,18 @@ export const createDefaultPayload = (client: Client): Payload => {
 		PersonaSkin: skin.skinData.PersonaSkin,
 		PieceTintColors: skin.skinData.PieceTintColors,
 		// IF set while in offline mode BDS will act its a new player each time.
-		PlatformOfflineId: client.options.offline === true ? "" : ClientData.nextUUID(username).replace(/-/g, ""),
-		PlatformOnlineId: client.options.offline === true ? "" : ClientData.OnlineId(),
+		PlatformOfflineId:
+			client.options.offline === true
+				? ""
+				: ClientData.nextUUID(username).replace(/-/g, ""),
+		PlatformOnlineId:
+			client.options.offline === true ? "" : ClientData.OnlineId(),
 		PlatformType: client.options.loginOptions.platformType,
 		// PlatformUserId: "",
-		PlayFabId: ClientData.nextUUID(username).replace(/-/g, "").slice(0, 16).toLowerCase(),
+		PlayFabId: ClientData.nextUUID(username)
+			.replace(/-/g, "")
+			.slice(0, 16)
+			.toLowerCase(),
 		PremiumSkin: skin.skinData.PremiumSkin,
 		SelfSignedId: ClientData.nextUUID(username),
 		ServerAddress: `${client.options.address}:${client.options.port}`,
