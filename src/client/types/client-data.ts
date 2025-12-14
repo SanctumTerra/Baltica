@@ -22,6 +22,7 @@ class ClientData {
 	/** This Contains the Shared Secret */
 	public sharedSecret!: Buffer;
 	/** This tells the jwt to use legacy auth */
+	public loginToken = "";
 	public legacy = true;
 
 	constructor(client: Client) {
@@ -39,7 +40,7 @@ class ClientData {
 		const encodedChain = JSON.stringify({
 			AuthenticationType: this.client.options.offline ? 2 : 0,
 			Certificate: certificate,
-			Token: "",
+			Token: this.loginToken,
 		});
 
 		loginPacket.protocol = ProtocolList[CurrentVersionConst];

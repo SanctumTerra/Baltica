@@ -46,6 +46,9 @@ async function authenticate(client: Client): Promise<void> {
 		const authflow = createAuthflow(client);
 		const chains = await getMinecraftBedrockToken(authflow, client);
 		const profile = extractProfile(chains[1]);
+		const sessionToken = await getMultiplayerSessionToken(authflow, client);
+		client.data.loginToken = sessionToken;
+
 		const endTime = Date.now();
 		Logger.info(
 			`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
@@ -58,6 +61,49 @@ async function authenticate(client: Client): Promise<void> {
 	} catch (error) {
 		Logger.error(
 			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+async function getMultiplayerSessionToken(
+	authflow: Authflow,
+	client: Client,
+): Promise<string> {
+	try {
+		// @ts-expect-error Method exists at runtime
+		const servicesToken = await authflow.getMinecraftBedrockServicesToken({});
+		const mcToken = servicesToken.mcToken;
+
+		const publicKey = client.data.loginData.clientX509;
+
+		const response = await fetch(
+			"https://authorization.franchise.minecraft-services.net/api/v1.0/multiplayer/session/start",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: mcToken,
+					"Accept-Encoding": "identity",
+				},
+				body: JSON.stringify({
+					publicKey: publicKey,
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const text = await response.text();
+			throw new Error(
+				`Multiplayer session start failed: ${response.status} ${response.statusText} - ${text}`,
+			);
+		}
+
+		const json = (await response.json()) as { result: { signedToken: string } };
+		return json.result.signedToken;
+	} catch (error) {
+		Logger.error(
+			`Error while getting Multiplayer Session Token: ${error instanceof Error ? error.message : String(error)}`,
 		);
 		throw error;
 	}
