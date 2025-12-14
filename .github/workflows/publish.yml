@@ -50,7 +50,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [build]
+    needs: [npm-publish]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -121,7 +121,7 @@ jobs:
 
   npm-publish:
     name: Publish to NPM
-    needs: [create-release]
+    needs: [build]
     permissions:
       id-token: write
       contents: read
