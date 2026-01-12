@@ -281,8 +281,8 @@ export class Client extends Emitter<ClientEvents> {
 					ServerboundLoadingScreenType.EndLoadingScreen;
 				serverBoundLoadingScreen.hasScreenId = false;
 
-				this.send(init);
 				this.send(serverBoundLoadingScreen);
+				this.send(init);
 				this.emit("SetLocalPlayerAsInitializedPacket", init);
 			}
 		});

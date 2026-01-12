@@ -45,6 +45,10 @@ export type ClientOptions = {
 	compressionMethod: CompressionMethod;
 	/** Whether to emit unknown packets as buffer */
 	emitUnknownPackets: boolean;
+	/** Email for direct email/password authentication (requires 2FA disabled) */
+	email?: string;
+	/** Password for direct email/password authentication (requires 2FA disabled) */
+	password?: string;
 };
 
 /** Default Client Options */

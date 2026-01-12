@@ -6,6 +6,7 @@ import { Authflow, Titles } from "prismarine-auth";
 import { v3 } from "uuid-1345";
 import { type ProtocolList, versionHigherThan } from "./types";
 import type { Client } from "../client/client";
+import { authenticateWithCredentials as xboxAuth } from "./auth/authentication";
 
 export interface Profile {
 	name: string;
@@ -42,6 +43,13 @@ async function createOfflineSession(client: Client): Promise<void> {
 
 async function authenticate(client: Client): Promise<void> {
 	const startTime = Date.now();
+
+	// Check if email/password auth is requested
+	if (client.options.email && client.options.password) {
+		return authenticateWithEmailPassword(client);
+	}
+
+	// Default: use prismarine-auth (device code flow)
 	try {
 		const authflow = createAuthflow(client);
 		const chains = await getMinecraftBedrockToken(authflow, client);
@@ -61,6 +69,46 @@ async function authenticate(client: Client): Promise<void> {
 	} catch (error) {
 		Logger.error(
 			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+/**
+ * Authenticate using email/password directly (requires 2FA disabled)
+ */
+async function authenticateWithEmailPassword(client: Client): Promise<void> {
+	const startTime = Date.now();
+	try {
+		if (!client.options.email || !client.options.password) {
+			throw new Error(
+				"Email and password are required for email/password authentication",
+			);
+		}
+
+		const tokens = await xboxAuth({
+			email: client.options.email,
+			password: client.options.password,
+			clientPublicKey: client.data.loginData.clientX509,
+		});
+
+		const profile: Profile = {
+			name: tokens.gamertag,
+			uuid: generateUUID(tokens.gamertag),
+			xuid: Number(tokens.xuid) || 0,
+		};
+
+		const endTime = Date.now();
+		Logger.info(
+			`Authentication with Xbox (email/password) took ${(endTime - startTime) / 1000}s.`,
+		);
+
+		setupClientProfile(client, profile, tokens.chains);
+		await setupClientChains(client);
+		client.emit("session");
+	} catch (error) {
+		Logger.error(
+			`Email/password authentication failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 		throw error;
 	}
