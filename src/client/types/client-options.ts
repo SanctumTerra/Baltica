@@ -49,6 +49,17 @@ export type ClientOptions = {
 	email?: string;
 	/** Password for direct email/password authentication (requires 2FA disabled) */
 	password?: string;
+	/** SOCKS5 Proxy for the client to use. */
+	proxy?: {
+		/** Proxy Host */
+		host: string;
+		/** Proxy Port */
+		port: number;
+		/** Proxy Username */
+		userId?: string;
+		/** Proxy Password */
+		password?: string;
+	};
 };
 
 /** Default Client Options */

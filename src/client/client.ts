@@ -105,10 +105,12 @@ export class Client extends Emitter<ClientEvents> {
 			? new WorkerClient({
 					address: this.options.address,
 					port: this.options.port,
+					proxy: this.options.proxy,
 				})
 			: new RaknetClient({
 					address: this.options.address,
 					port: this.options.port,
+					proxy: this.options.proxy,
 				});
 		/** Create ClientData to store and handle auth data */
 		this.data = new ClientData(this);
