@@ -64,13 +64,41 @@ export async function authenticateWithCredentials(
 		Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
 		return { chains, xuid, gamertag, userHash };
 	} catch (error: unknown) {
-		const err = error as Error & { attributes?: { code?: string } };
+		const err = error as Error & {
+			attributes?: { code?: string };
+			data?: {
+				attributes?: {
+					extra?: { statusCode?: number; body?: { XErr?: number } };
+				};
+			};
+		};
 
 		if (err.attributes?.code === "INVALID_CREDENTIALS_OR_2FA_ENABLED") {
 			throw new Error(
 				"Authentication failed: Invalid credentials or 2FA is enabled.\n" +
 					"Direct email/password login only works with 2FA DISABLED.",
 			);
+		}
+
+		// Check for Xbox Live specific errors
+		const xErr = err.data?.attributes?.extra?.body?.XErr;
+		if (xErr) {
+			const xboxErrors: Record<number, string> = {
+				2148916233:
+					"No Xbox profile exists for this account. Create one at https://xbox.com/live",
+				2148916227: "Account banned by Xbox for violating Community Standards.",
+				2148916229:
+					"Account restricted - guardian permission required. Visit https://account.microsoft.com/family/",
+				2148916234:
+					"Must accept Xbox Terms of Service. Login at https://xbox.com",
+				2148916235: "Account region not authorized by Xbox.",
+				2148916236:
+					"Account requires age verification. Login at https://login.live.com",
+				2148916238: "Account under 18 must be added to a family by an adult.",
+			};
+			if (xboxErrors[xErr]) {
+				throw new Error(`Xbox Live error: ${xboxErrors[xErr]}`);
+			}
 		}
 
 		throw error;

@@ -110,6 +110,7 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 		Logger.error(
 			`Email/password authentication failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
+		Logger.warn("Make sure you have an xbox profile crated!");
 		throw error;
 	}
 }
