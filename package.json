@@ -1,7 +1,7 @@
 {
   "name": "baltica",
   "description": "Library for Minecraft Bedrock Edition community developers.",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "minecraft": "1.21.130",
   "main": "dist/index.js",
   "license": "MIT",
@@ -21,9 +21,9 @@
     }
   ],
   "dependencies": {
-    "@sanctumterra/raknet": "^1.4.7",
+    "@sanctumterra/raknet": "^1.4.8",
     "@serenityjs/binarystream": "^3.0.10",
-    "@serenityjs/protocol": "^0.8.14",
+    "@serenityjs/protocol": "^0.8.17",
     "@xboxreplay/xboxlive-auth": "^5.1.0",
     "jose": "^5.10.0",
     "prismarine-auth": "^2.7.0",
@@ -31,8 +31,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@types/node": "^22.17.1",
+    "@types/node": "^22.19.6",
     "@types/uuid-1345": "^0.99.25",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }
