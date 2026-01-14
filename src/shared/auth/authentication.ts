@@ -1,9 +1,7 @@
-import {
-	authenticate as xboxAuthenticate,
-	live,
-	xnet,
-} from "@xboxreplay/xboxlive-auth";
+import { live, xnet } from "@xboxreplay/xboxlive-auth";
 import type { AuthenticateResponse, Email } from "@xboxreplay/xboxlive-auth";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { Logger } from "@sanctumterra/raknet";
 
 export interface BedrockTokens {
@@ -17,88 +15,151 @@ export interface AuthOptions {
 	email: string;
 	password: string;
 	clientPublicKey: string;
+	cacheDir?: string;
+}
+
+interface CachedAuth {
+	userToken: string;
+	userHash: string;
+	notAfter: string;
+	obtainedOn: number;
 }
 
 const MINECRAFT_BEDROCK_RELYING_PARTY = "https://multiplayer.minecraft.net/";
 
+function hashString(str: string): string {
+	let hash = 0;
+	for (let i = 0; i < str.length; i++) {
+		const char = str.charCodeAt(i);
+		hash = (hash << 5) - hash + char;
+		hash = hash & hash;
+	}
+	return Math.abs(hash).toString(16).slice(0, 6);
+}
+
+function ensureDir(dir: string): void {
+	if (!fs.existsSync(dir)) {
+		fs.mkdirSync(dir, { recursive: true });
+	}
+}
+
+function getCacheFile(cacheDir: string, email: string): string {
+	return path.join(cacheDir, `${hashString(email)}_xbl-user-cache.json`);
+}
+
+function loadCache(cacheFile: string): CachedAuth | null {
+	try {
+		if (fs.existsSync(cacheFile)) {
+			const cached = JSON.parse(
+				fs.readFileSync(cacheFile, "utf-8"),
+			) as CachedAuth;
+			// Check if token is still valid (with 1 hour buffer)
+			const expiresAt = new Date(cached.notAfter).getTime();
+			if (Date.now() < expiresAt - 3600000) {
+				return cached;
+			}
+			Logger.info("Cached user token expired");
+		}
+	} catch {
+		/* ignore */
+	}
+	return null;
+}
+
+function saveCache(
+	cacheFile: string,
+	userToken: string,
+	userHash: string,
+	notAfter: string,
+): void {
+	try {
+		ensureDir(path.dirname(cacheFile));
+		const data: CachedAuth = {
+			userToken,
+			userHash,
+			notAfter,
+			obtainedOn: Date.now(),
+		};
+		fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
+	} catch {
+		/* ignore */
+	}
+}
+
 /**
  * Authenticates with Xbox Live using email/password and obtains Minecraft Bedrock tokens
- * NOTE: Only works if 2FA is DISABLED on the Microsoft account
+ * Caches Xbox user token (~14 days valid) to minimize login requests
  */
 export async function authenticateWithCredentials(
 	options: AuthOptions,
 ): Promise<BedrockTokens> {
-	const { email, password, clientPublicKey } = options;
+	const { email, password, clientPublicKey, cacheDir } = options;
+	const cacheFile = cacheDir ? getCacheFile(cacheDir, email) : null;
 
-	Logger.info("Authenticating with Xbox Live...");
+	let userToken: string;
+	let userHash: string;
 
+	// Try to use cached user token first
+	const cached = cacheFile ? loadCache(cacheFile) : null;
+	if (cached) {
+		Logger.info("Using cached Xbox user token...");
+		userToken = cached.userToken;
+		userHash = cached.userHash;
+	} else {
+		// Fresh login required
+		Logger.info("Authenticating with Xbox Live...");
+
+		const accessToken = await freshLogin(email, password);
+
+		// Exchange for Xbox user token (valid ~14 days)
+		const userTokenResp = await xnet.exchangeRpsTicketForUserToken(
+			accessToken,
+			"t",
+		);
+		userToken = userTokenResp.Token;
+		userHash = userTokenResp.DisplayClaims.xui[0].uhs;
+
+		// Cache the user token
+		if (cacheFile) {
+			saveCache(cacheFile, userToken, userHash, userTokenResp.NotAfter);
+		}
+	}
+
+	// Get XSTS token for Minecraft Bedrock (short-lived, always fetch fresh)
+	const xstsResp = await xnet.exchangeTokenForXSTSToken(userToken, {
+		XSTSRelyingParty: MINECRAFT_BEDROCK_RELYING_PARTY,
+		sandboxId: "RETAIL",
+	});
+
+	const xuid = xstsResp.DisplayClaims.xui[0].xid || "";
+
+	// Get Minecraft Bedrock chains
+	const chains = await getMinecraftBedrockChains(
+		xstsResp.Token,
+		userHash,
+		clientPublicKey,
+	);
+	const gamertag = extractGamertagFromChains(chains);
+
+	Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
+	return { chains, xuid, gamertag, userHash };
+}
+
+async function freshLogin(email: string, password: string): Promise<string> {
 	try {
 		const liveToken = await live.authenticateWithCredentials({
 			email: email as Email,
 			password,
 		});
-
-		// Exchange for Xbox user token
-		const userTokenResp = await xnet.exchangeRpsTicketForUserToken(
-			liveToken.access_token,
-			"t",
-		);
-		const userHash = userTokenResp.DisplayClaims.xui[0].uhs;
-
-		// Get XSTS token for Minecraft Bedrock
-		const xstsResp = await xnet.exchangeTokenForXSTSToken(userTokenResp.Token, {
-			XSTSRelyingParty: MINECRAFT_BEDROCK_RELYING_PARTY,
-			sandboxId: "RETAIL",
-		});
-
-		const xuid = xstsResp.DisplayClaims.xui[0].xid || "";
-
-		// Get Minecraft Bedrock chains using the client's public key
-		const chains = await getMinecraftBedrockChains(
-			xstsResp.Token,
-			userHash,
-			clientPublicKey,
-		);
-		const gamertag = extractGamertagFromChains(chains);
-
-		Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
-		return { chains, xuid, gamertag, userHash };
+		return liveToken.access_token;
 	} catch (error: unknown) {
-		const err = error as Error & {
-			attributes?: { code?: string };
-			data?: {
-				attributes?: {
-					extra?: { statusCode?: number; body?: { XErr?: number } };
-				};
-			};
-		};
+		const err = error as Error & { attributes?: { code?: string } };
 
 		if (err.attributes?.code === "INVALID_CREDENTIALS_OR_2FA_ENABLED") {
 			throw new Error(
 				"Authentication failed: Invalid credentials or 2FA is enabled.\n" +
 					"Direct email/password login only works with 2FA DISABLED.",
 			);
-		}
-
-		// Check for Xbox Live specific errors
-		const xErr = err.data?.attributes?.extra?.body?.XErr;
-		if (xErr) {
-			const xboxErrors: Record<number, string> = {
-				2148916233:
-					"No Xbox profile exists for this account. Create one at https://xbox.com/live",
-				2148916227: "Account banned by Xbox for violating Community Standards.",
-				2148916229:
-					"Account restricted - guardian permission required. Visit https://account.microsoft.com/family/",
-				2148916234:
-					"Must accept Xbox Terms of Service. Login at https://xbox.com",
-				2148916235: "Account region not authorized by Xbox.",
-				2148916236:
-					"Account requires age verification. Login at https://login.live.com",
-				2148916238: "Account under 18 must be added to a family by an adult.",
-			};
-			if (xboxErrors[xErr]) {
-				throw new Error(`Xbox Live error: ${xboxErrors[xErr]}`);
-			}
 		}
 
 		throw error;
@@ -125,6 +186,15 @@ async function getMinecraftBedrockChains(
 
 	if (!response.ok) {
 		const text = await response.text();
+		if (response.status === 401) {
+			throw new Error(
+				"Minecraft Bedrock authentication failed (401 UNAUTHORIZED).\n" +
+					"This usually means:\n" +
+					"  1. The account does not have an Xbox profile (create one at xbox.com)\n" +
+					"  2. The account does not own Minecraft Bedrock Edition\n" +
+					"  3. The account needs to accept Xbox/Minecraft terms of service",
+			);
+		}
 		throw new Error(
 			`Minecraft Bedrock auth failed: ${response.status} - ${text}`,
 		);
@@ -151,5 +221,5 @@ function extractGamertagFromChains(chains: string[]): string {
 	return "";
 }
 
-export { xboxAuthenticate as authenticate, live, xnet };
+export { live, xnet };
 export type { AuthenticateResponse, Email };
