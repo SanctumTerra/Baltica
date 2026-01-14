@@ -3,7 +3,6 @@ import { createHash, createPublicKey } from "node:crypto";
 import {
 	Client as RaknetClient,
 	ConnectionStatus,
-	Frame,
 	Logger,
 	Priority,
 } from "@sanctumterra/raknet";
@@ -87,6 +86,7 @@ export class Client extends Emitter<ClientEvents> {
 	startGameData!: StartGamePacket;
 	/** Whether we should continue after sending Login (Proxy use) */
 	cancelPastLogin: boolean;
+	private disconnectReason?: string;
 
 	constructor(options: Partial<ClientOptions>) {
 		super();
@@ -114,10 +114,9 @@ export class Client extends Emitter<ClientEvents> {
 				});
 		/** Create ClientData to store and handle auth data */
 		this.data = new ClientData(this);
-		const time = Date.now();
 
-		/** Session event gets mojang (minecraft) auth session */
-		/** NOTE! This takes like 30-100ms for offline mode which kinda feels slow but not really */
+		this.raknet.on("disconnect", () => this.cleanup());
+
 		this.once("session", () => {
 			this.sessionReady = true;
 		});
@@ -289,10 +288,23 @@ export class Client extends Emitter<ClientEvents> {
 			}
 		});
 		this.on("DisconnectPacket", (packet) => {
-			this.status = ConnectionStatus.Disconnected;
-			this.raknet.disconnect();
-			console.log(packet.message);
+			this.disconnect(packet.message.message ?? undefined);
 		});
+	}
+
+	public disconnect(reason?: string): void {
+		if (this.status === ConnectionStatus.Disconnected) return;
+		this.disconnectReason = reason;
+		this.raknet.disconnect();
+	}
+
+	private cleanup(): void {
+		this.status = ConnectionStatus.Disconnected;
+		this._encryptionEnabled = false;
+		this._compressionEnabled = false;
+		this.sessionReady = false;
+		this.emit("disconnect", this.disconnectReason);
+		this.disconnectReason = undefined;
 	}
 
 	public startEncryption(iv: Buffer): void {
