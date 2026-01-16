@@ -1,8 +1,17 @@
-import { live, xnet } from "@xboxreplay/xboxlive-auth";
-import type { AuthenticateResponse, Email } from "@xboxreplay/xboxlive-auth";
+/**
+ * Xbox Live Authentication Module
+ * 
+ * Based on the authentication flow from @xboxreplay/xboxlive-auth
+ * https://github.com/XboxReplay/xboxlive-auth
+ * 
+ * Modified to support SOCKS5 proxies for all HTTP requests and Minecraft Authentication
+ */
+
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Logger } from "@sanctumterra/raknet";
+import { socksDispatcher } from "fetch-socks";
+import { fetch as undiciFetch, type RequestInit as UndiciRequestInit } from "undici";
 
 export interface BedrockTokens {
 	chains: string[];
@@ -11,11 +20,19 @@ export interface BedrockTokens {
 	userHash: string;
 }
 
+export interface ProxyOptions {
+	host: string;
+	port: number;
+	userId?: string;
+	password?: string;
+}
+
 export interface AuthOptions {
 	email: string;
 	password: string;
 	clientPublicKey: string;
 	cacheDir?: string;
+	proxy?: ProxyOptions;
 }
 
 interface CachedAuth {
@@ -25,7 +42,18 @@ interface CachedAuth {
 	obtainedOn: number;
 }
 
+interface XboxTokenResponse {
+	Token: string;
+	NotAfter: string;
+	DisplayClaims: {
+		xui: Array<{ uhs: string; xid?: string; gtg?: string }>;
+	};
+}
+
 const MINECRAFT_BEDROCK_RELYING_PARTY = "https://multiplayer.minecraft.net/";
+const XBOX_AUTH_CLIENT_ID = "00000000441cc96b";
+
+type ProxiedFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 function hashString(str: string): string {
 	let hash = 0;
@@ -53,7 +81,6 @@ function loadCache(cacheFile: string): CachedAuth | null {
 			const cached = JSON.parse(
 				fs.readFileSync(cacheFile, "utf-8"),
 			) as CachedAuth;
-			// Check if token is still valid (with 1 hour buffer)
 			const expiresAt = new Date(cached.notAfter).getTime();
 			if (Date.now() < expiresAt - 3600000) {
 				return cached;
@@ -86,58 +113,87 @@ function saveCache(
 	}
 }
 
+function createProxiedFetch(proxy?: ProxyOptions): ProxiedFetch {
+	if (!proxy) {
+		return fetch;
+	}
+
+	const dispatcher = socksDispatcher({
+		type: 5,
+		host: proxy.host,
+		port: proxy.port,
+		userId: proxy.userId,
+		password: proxy.password,
+	});
+
+	return async (input: string | URL, init?: RequestInit): Promise<Response> => {
+		const url = typeof input === "string" ? input : input.toString();
+		const response = await undiciFetch(url, {
+			...init,
+			dispatcher,
+		} as UndiciRequestInit);
+		return response as unknown as Response;
+	};
+}
+
+
 /**
  * Authenticates with Xbox Live using email/password and obtains Minecraft Bedrock tokens
- * Caches Xbox user token (~14 days valid) to minimize login requests
+ * Supports SOCKS5 proxy for all authentication requests
  */
 export async function authenticateWithCredentials(
 	options: AuthOptions,
 ): Promise<BedrockTokens> {
-	const { email, password, clientPublicKey, cacheDir } = options;
+	const { email, password, clientPublicKey, cacheDir, proxy } = options;
 	const cacheFile = cacheDir ? getCacheFile(cacheDir, email) : null;
+	const proxiedFetch = createProxiedFetch(proxy);
+
+	// Verify proxy is working by checking our IP
+	if (proxy) {
+		try {
+			const ipResp = await proxiedFetch("https://api.ipify.org?format=json");
+			const ipData = await ipResp.json() as { ip: string };
+			Logger.info(`Proxy IP verified: ${ipData.ip}`);
+		} catch (e) {
+			Logger.warn(`Could not verify proxy IP: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
 
 	let userToken: string;
 	let userHash: string;
 
-	// Try to use cached user token first
 	const cached = cacheFile ? loadCache(cacheFile) : null;
 	if (cached) {
 		Logger.info("Using cached Xbox user token...");
 		userToken = cached.userToken;
 		userHash = cached.userHash;
 	} else {
-		// Fresh login required
-		Logger.info("Authenticating with Xbox Live...");
+		Logger.info(`Authenticating with Xbox Live...${proxy ? ` (via proxy ${proxy.host}:${proxy.port})` : ""}`);
 
-		const accessToken = await freshLogin(email, password);
+		const accessToken = await getMicrosoftAccessToken(email, password, proxiedFetch);
 
-		// Exchange for Xbox user token (valid ~14 days)
-		const userTokenResp = await xnet.exchangeRpsTicketForUserToken(
-			accessToken,
-			"t",
-		);
+		const userTokenResp = await exchangeRpsTicketForUserToken(accessToken, proxiedFetch);
 		userToken = userTokenResp.Token;
 		userHash = userTokenResp.DisplayClaims.xui[0].uhs;
 
-		// Cache the user token
 		if (cacheFile) {
 			saveCache(cacheFile, userToken, userHash, userTokenResp.NotAfter);
 		}
 	}
 
-	// Get XSTS token for Minecraft Bedrock (short-lived, always fetch fresh)
-	const xstsResp = await xnet.exchangeTokenForXSTSToken(userToken, {
-		XSTSRelyingParty: MINECRAFT_BEDROCK_RELYING_PARTY,
-		sandboxId: "RETAIL",
-	});
+	const xstsResp = await exchangeTokenForXSTSToken(
+		userToken,
+		MINECRAFT_BEDROCK_RELYING_PARTY,
+		proxiedFetch,
+	);
 
 	const xuid = xstsResp.DisplayClaims.xui[0].xid || "";
 
-	// Get Minecraft Bedrock chains
 	const chains = await getMinecraftBedrockChains(
 		xstsResp.Token,
 		userHash,
 		clientPublicKey,
+		proxiedFetch,
 	);
 	const gamertag = extractGamertagFromChains(chains);
 
@@ -145,33 +201,268 @@ export async function authenticateWithCredentials(
 	return { chains, xuid, gamertag, userHash };
 }
 
-async function freshLogin(email: string, password: string): Promise<string> {
-	try {
-		const liveToken = await live.authenticateWithCredentials({
-			email: email as Email,
-			password,
-		});
-		return liveToken.access_token;
-	} catch (error: unknown) {
-		const err = error as Error & { attributes?: { code?: string } };
+/**
+ * Get Microsoft access token using email/password via OAuth flow
+ * This implements the full browser-like login flow
+ */
+async function getMicrosoftAccessToken(
+	email: string,
+	password: string,
+	proxiedFetch: ProxiedFetch,
+): Promise<string> {
+	const authUrl = "https://login.live.com/oauth20_authorize.srf";
+	const params = new URLSearchParams({
+		client_id: XBOX_AUTH_CLIENT_ID,
+		redirect_uri: "https://login.live.com/oauth20_desktop.srf",
+		response_type: "token",
+		scope: "service::user.auth.xboxlive.com::MBI_SSL",
+		display: "touch",
+		locale: "en",
+	});
 
-		if (err.attributes?.code === "INVALID_CREDENTIALS_OR_2FA_ENABLED") {
-			throw new Error(
-				"Authentication failed: Invalid credentials or 2FA is enabled.\n" +
-					"Direct email/password login only works with 2FA DISABLED.",
-			);
+	const preAuthResp = await proxiedFetch(`${authUrl}?${params}`, {
+		headers: {
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+			Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+			"Accept-Language": "en-US,en;q=0.5",
+		},
+	});
+
+	if (!preAuthResp.ok) {
+		throw new Error(`Pre-auth request failed: ${preAuthResp.status}`);
+	}
+
+	const preAuthHtml = await preAuthResp.text();
+	const cookies = extractCookies(preAuthResp.headers);
+
+	const { ppft, urlPost } = extractLoginParams(preAuthHtml);
+
+	const loginBody = new URLSearchParams({
+		login: email,
+		loginfmt: email,
+		passwd: password,
+		PPFT: ppft,
+		PPSX: "Passpor",
+		NewUser: "1",
+		FoundMSAs: "",
+		fspost: "0",
+		i21: "0",
+		CookieDisclosure: "0",
+		IsFidoSupported: "1",
+		isSignupPost: "0",
+		isRecoveryAttemptPost: "0",
+		i13: "0",
+		i19: Math.floor(Math.random() * 100000).toString(),
+	});
+
+	const loginResp = await proxiedFetch(urlPost, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/x-www-form-urlencoded",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+			Cookie: cookies,
+			Referer: `${authUrl}?${params}`,
+			Origin: "https://login.live.com",
+		},
+		body: loginBody.toString(),
+		redirect: "manual",
+	});
+
+	// Check for access token in redirect
+	let location = loginResp.headers.get("location") || "";
+	
+	// Follow redirects manually to find the access token
+	let attempts = 0;
+	while (attempts < 5 && !location.includes("access_token=")) {
+		if (!location) {
+			// Check if we got an error page
+			const responseText = await loginResp.text();
+			if (responseText.includes("sErrTxt") || responseText.includes("Your account or password is incorrect")) {
+				throw new Error("Invalid credentials");
+			}
+			if (responseText.includes("Sign in a different way") || responseText.includes("idA_PWD_SwitchToCredPicker")) {
+				throw new Error("2FA is enabled on this account. Direct login requires 2FA to be disabled.");
+			}
+			
+			// Try to extract access token from response body (some flows embed it)
+			const tokenMatch = responseText.match(/access_token=([^&"']+)/);
+			if (tokenMatch) {
+				return decodeURIComponent(tokenMatch[1]);
+			}
+			
+			throw new Error("Failed to get redirect URL from login response");
 		}
 
-		throw error;
+		if (location.includes("access_token=")) {
+			break;
+		}
+
+		const redirectResp = await proxiedFetch(location, {
+			headers: {
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+				Cookie: cookies,
+			},
+			redirect: "manual",
+		});
+		location = redirectResp.headers.get("location") || "";
+		attempts++;
 	}
+
+	// Extract access token from URL fragment
+	const tokenMatch = location.match(/access_token=([^&]+)/);
+	if (tokenMatch) {
+		return decodeURIComponent(tokenMatch[1]);
+	}
+
+	throw new Error("Failed to obtain access token from Microsoft");
 }
 
+
+function extractCookies(headers: Headers): string {
+	const setCookies = headers.get("set-cookie");
+	if (!setCookies) return "";
+	
+	// Parse and combine cookies
+	const cookies: string[] = [];
+	const cookieStrings = setCookies.split(/,(?=[^;]*=)/);
+	for (const cookieStr of cookieStrings) {
+		const match = cookieStr.match(/^([^=]+)=([^;]*)/);
+		if (match) {
+			cookies.push(`${match[1].trim()}=${match[2]}`);
+		}
+	}
+	return cookies.join("; ");
+}
+
+function extractLoginParams(html: string): { ppft: string; urlPost: string } {
+	let ppft: string | null = null;
+
+	// Pattern for sFTTag with escaped quotes (JSON format)
+	const sFTTagMatch = html.match(/sFTTag":"<input[^>]*value=\\"([^"\\]+)\\"/);
+	if (sFTTagMatch) {
+		ppft = sFTTagMatch[1];
+	}
+
+	// Fallback patterns
+	if (!ppft) {
+		const ppftPatterns = [
+			/sFTTag:'[^']*value="([^"]+)"/,
+			/name="PPFT"[^>]*value="([^"]+)"/,
+			/value="([^"]+)"[^>]*name="PPFT"/,
+			/<input[^>]*name="PPFT"[^>]*value="([^"]+)"/,
+			/"sFT"\s*:\s*"([^"]+)"/,
+			/sFT:'([^']+)'/,
+			/"sFT":"([^"]+)"/,
+		];
+
+		for (const pattern of ppftPatterns) {
+			const match = html.match(pattern);
+			if (match) {
+				ppft = match[1];
+				break;
+			}
+		}
+	}
+
+	if (!ppft) {
+		throw new Error("Failed to extract PPFT token from login page");
+	}
+
+	// Extract urlPost
+	const urlPostPatterns = [
+		/urlPost:\s*'([^']+)'/,
+		/urlPost:\s*"([^"]+)"/,
+		/"urlPost"\s*:\s*"([^"]+)"/,
+	];
+
+	let urlPost = "https://login.live.com/ppsecure/post.srf";
+	for (const pattern of urlPostPatterns) {
+		const match = html.match(pattern);
+		if (match) {
+			urlPost = match[1];
+			break;
+		}
+	}
+
+	return { ppft, urlPost };
+}
+
+/**
+ * Exchange Microsoft access token for Xbox User Token
+ */
+async function exchangeRpsTicketForUserToken(
+	accessToken: string,
+	proxiedFetch: ProxiedFetch,
+): Promise<XboxTokenResponse> {
+	const response = await proxiedFetch("https://user.auth.xboxlive.com/user/authenticate", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Accept: "application/json",
+			"x-xbl-contract-version": "1",
+		},
+		body: JSON.stringify({
+			RelyingParty: "http://auth.xboxlive.com",
+			TokenType: "JWT",
+			Properties: {
+				AuthMethod: "RPS",
+				SiteName: "user.auth.xboxlive.com",
+				RpsTicket: `t=${accessToken}`,
+			},
+		}),
+	});
+
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(`Xbox user token exchange failed: ${response.status} - ${text}`);
+	}
+
+	return response.json() as Promise<XboxTokenResponse>;
+}
+
+/**
+ * Exchange Xbox User Token for XSTS Token
+ */
+async function exchangeTokenForXSTSToken(
+	userToken: string,
+	relyingParty: string,
+	proxiedFetch: ProxiedFetch,
+): Promise<XboxTokenResponse> {
+	const response = await proxiedFetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Accept: "application/json",
+			"x-xbl-contract-version": "1",
+		},
+		body: JSON.stringify({
+			RelyingParty: relyingParty,
+			TokenType: "JWT",
+			Properties: {
+				SandboxId: "RETAIL",
+				UserTokens: [userToken],
+			},
+		}),
+	});
+
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(`Xbox XSTS token exchange failed: ${response.status} - ${text}`);
+	}
+
+	return response.json() as Promise<XboxTokenResponse>;
+}
+
+/**
+ * Get Minecraft Bedrock authentication chains
+ */
 async function getMinecraftBedrockChains(
 	xstsToken: string,
 	userHash: string,
 	clientPublicKey: string,
+	proxiedFetch: ProxiedFetch,
 ): Promise<string[]> {
-	const response = await fetch(
+	const response = await proxiedFetch(
 		"https://multiplayer.minecraft.net/authentication",
 		{
 			method: "POST",
@@ -188,16 +479,11 @@ async function getMinecraftBedrockChains(
 		const text = await response.text();
 		if (response.status === 401) {
 			throw new Error(
-				"Minecraft Bedrock authentication failed (401 UNAUTHORIZED).\n" +
-					"This usually means:\n" +
-					"  1. The account does not have an Xbox profile (create one at xbox.com)\n" +
-					"  2. The account does not own Minecraft Bedrock Edition\n" +
-					"  3. The account needs to accept Xbox/Minecraft terms of service",
+				"Minecraft Bedrock authentication failed (401).\n" +
+					"The account may not have an Xbox profile or Minecraft Bedrock Edition.",
 			);
 		}
-		throw new Error(
-			`Minecraft Bedrock auth failed: ${response.status} - ${text}`,
-		);
+		throw new Error(`Minecraft Bedrock auth failed: ${response.status} - ${text}`);
 	}
 
 	const data = (await response.json()) as { chain: string[] };
@@ -221,5 +507,12 @@ function extractGamertagFromChains(chains: string[]): string {
 	return "";
 }
 
-export { live, xnet };
-export type { AuthenticateResponse, Email };
+// Re-export types for compatibility
+export type Email = string;
+export interface AuthenticateResponse {
+	access_token: string;
+	token_type: string;
+	expires_in: number;
+	scope: string;
+	user_id: string;
+}
