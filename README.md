@@ -51,27 +51,7 @@ const client = new Client({
   port: 19132,
 });
 
-// Connect and get server info
 await client.connect();
-
-// Listen for chat messages
-client.on("TextPacket", (packet) => {
-  console.log(`Got message: ${packet.message}`);
-});
-
-// Send a friendly greeting when connected
-client.on("connect", () => {
-  const packet = new TextPacket();
-   packet.message = 'Hey everyone! 👋';
-   packet.needsTranslation = false;
-   packet.parameters = [];
-   packet.platformChatId = '';
-   packet.source = client.username;
-   packet.type = TextPacketType.Chat;
-   packet.xuid = client.profile.xuid.toString();
-   packet.filtered = '';
-  client.send(packet.serialize());
-});
 ```
 
 ### Email/Password Authentication
@@ -91,8 +71,8 @@ await client.connect();
 
 **Important Notes:**
 - This method only works with accounts that have 2FA (Two-Factor Authentication) **disabled**
-- The account must have an Xbox profile and own Minecraft Bedrock Edition
-- User tokens are cached for ~14 days to minimize login requests
+- The account must have an Xbox profile and own Minecraft Bedrock Edition or launched minecraft at least once.
+- User tokens are cached for ~14 days to minimize login requests (BETA)
 - Tokens are stored in the `tokens` folder by default
 
 ### Using a Proxy
