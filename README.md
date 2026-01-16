@@ -74,6 +74,53 @@ client.on("connect", () => {
 });
 ```
 
+### Email/Password Authentication
+
+You can authenticate directly with your Microsoft account using email and password:
+
+```typescript
+const client = new Client({
+  address: "play.server.com",
+  port: 19132,
+  email: "your-email@outlook.com",
+  password: "your-password",
+});
+
+await client.connect();
+```
+
+**Important Notes:**
+- This method only works with accounts that have 2FA (Two-Factor Authentication) **disabled**
+- The account must have an Xbox profile and own Minecraft Bedrock Edition
+- User tokens are cached for ~14 days to minimize login requests
+- Tokens are stored in the `tokens` folder by default
+
+### Using a Proxy
+
+Baltica supports SOCKS5 proxies for client connections:
+
+```typescript
+const client = new Client({
+  address: "play.server.com",
+  port: 19132,
+  email: "your-email@outlook.com",
+  password: "your-password",
+  proxy: {
+    host: "proxy.example.com",
+    port: 1080,
+    userId: "proxy-username",    // Optional
+    password: "proxy-password",  // Optional
+  },
+});
+
+await client.connect();
+```
+
+This is useful for:
+- Bypassing IP restrictions
+- Testing from different geographic locations
+- Managing multiple bot connections
+
 ### Server Usage
 
 Want to create your own Minecraft server? We got you:
