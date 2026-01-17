@@ -15,6 +15,13 @@ type LoginData = {
 	clientX509: string;
 	clientIdentityChain: string;
 	clientUserChain: string;
+	sessionTokenData?: {
+		ipt: string;
+		tid: string;
+		mid: string;
+		xid: string;
+		cpk: string;
+	};
 };
 
 export const prepareLoginData = (): LoginData => {

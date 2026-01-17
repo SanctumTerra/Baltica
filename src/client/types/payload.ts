@@ -39,6 +39,7 @@ export type Payload = {
 	PlatformOnlineId: string;
 	PlatformType: number;
 	PlayFabId: string;
+	pfcd?: string; // PlayFab Client Data
 	// PlatformUserId: string;
 	PremiumSkin: boolean;
 	SelfSignedId: string;

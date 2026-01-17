@@ -21,6 +21,9 @@ export interface BedrockTokens {
 	xuid: string;
 	gamertag: string;
 	userHash: string;
+	xstsToken: string;
+	playfabXstsToken: string;
+	playfabUserHash: string;
 }
 
 export interface ProxyOptions {
@@ -54,6 +57,7 @@ interface XboxTokenResponse {
 }
 
 const MINECRAFT_BEDROCK_RELYING_PARTY = "https://multiplayer.minecraft.net/";
+const PLAYFAB_RELYING_PARTY = "https://b980a380.minecraft.playfabapi.com/";
 const XBOX_AUTH_CLIENT_ID = "00000000441cc96b";
 
 type ProxiedFetch = (
@@ -197,6 +201,7 @@ export async function authenticateWithCredentials(
 		}
 	}
 
+	// Get XSTS token for Minecraft Bedrock
 	const xstsResp = await exchangeTokenForXSTSToken(
 		userToken,
 		MINECRAFT_BEDROCK_RELYING_PARTY,
@@ -204,6 +209,13 @@ export async function authenticateWithCredentials(
 	);
 
 	const xuid = xstsResp.DisplayClaims.xui[0].xid || "";
+
+	// Get XSTS token for Playfab (needed for session token)
+	const playfabXstsResp = await exchangeTokenForXSTSToken(
+		userToken,
+		PLAYFAB_RELYING_PARTY,
+		proxiedFetch,
+	);
 
 	const chains = await getMinecraftBedrockChains(
 		xstsResp.Token,
@@ -214,7 +226,15 @@ export async function authenticateWithCredentials(
 	const gamertag = extractGamertagFromChains(chains);
 
 	Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
-	return { chains, xuid, gamertag, userHash };
+	return {
+		chains,
+		xuid,
+		gamertag,
+		userHash,
+		xstsToken: xstsResp.Token,
+		playfabXstsToken: playfabXstsResp.Token,
+		playfabUserHash: playfabXstsResp.DisplayClaims.xui[0].uhs,
+	};
 }
 
 /**

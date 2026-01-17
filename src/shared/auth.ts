@@ -100,6 +100,47 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 			xuid: Number(tokens.xuid) || 0,
 		};
 
+		// Get Playfab session ticket
+		const playfabData = await getPlayfabSessionTicket(
+			tokens.playfabUserHash,
+			tokens.playfabXstsToken,
+		);
+
+		// Get the multiplayer session token
+		// First get the MC services token (mcToken)
+		const mcToken = await getMinecraftServicesTokenFromPlayfab(
+			playfabData.sessionTicket,
+		);
+		
+		// Then use mcToken to get the multiplayer session token
+		const sessionToken = await getMultiplayerSessionTokenFromMcToken(
+			mcToken,
+			client.data.loginData.clientX509,
+		);
+		
+		client.data.loginToken = sessionToken;
+		
+		// Extract pfcd from session token and store it
+		try {
+			const tokenParts = sessionToken.split(".");
+			if (tokenParts.length >= 2) {
+				const payload = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
+				if (payload.pfcd) {
+					client.data.payload.pfcd = payload.pfcd;
+				}
+				// Store session token data for client chain
+				client.data.loginData.sessionTokenData = {
+					ipt: payload.ipt,
+					tid: payload.prop ? JSON.parse(payload.prop).tid : undefined,
+					mid: payload.prop ? JSON.parse(payload.prop).mid : undefined,
+					xid: payload.xid,
+					cpk: payload.cpk,
+				};
+			}
+		} catch (e) {
+			Logger.warn(`Failed to extract pfcd from session token: ${e instanceof Error ? e.message : String(e)}`);
+		}
+
 		const endTime = Date.now();
 		Logger.info(
 			`Authentication with Xbox (email/password) took ${(endTime - startTime) / 1000}s.`,
@@ -152,6 +193,202 @@ async function getMultiplayerSessionToken(
 
 		const json = (await response.json()) as { result: { signedToken: string } };
 		return json.result.signedToken;
+	} catch (error) {
+		Logger.error(
+			`Error while getting Multiplayer Session Token: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+async function getPlayfabSessionTicket(
+	playfabUserHash: string,
+	playfabXstsToken: string,
+): Promise<{ sessionTicket: string; playFabId: string }> {
+	try {
+		const response = await fetch(
+			"https://20ca2.playfabapi.com/Client/LoginWithXbox",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					CreateAccount: true,
+					EncryptedRequest: null,
+					InfoRequestParameters: {
+						GetCharacterInventories: false,
+						GetCharacterList: false,
+						GetPlayerProfile: true,
+						GetPlayerStatistics: false,
+						GetTitleData: false,
+						GetUserAccountInfo: true,
+						GetUserData: false,
+						GetUserInventory: false,
+						GetUserReadOnlyData: false,
+						GetUserVirtualCurrency: false,
+						PlayerStatisticNames: null,
+						ProfileConstraints: null,
+						TitleDataKeys: null,
+						UserDataKeys: null,
+						UserReadOnlyDataKeys: null,
+					},
+					PlayerSecret: null,
+					TitleId: "20CA2",
+					XboxToken: `XBL3.0 x=${playfabUserHash};${playfabXstsToken}`,
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const text = await response.text();
+			throw new Error(
+				`Playfab login failed: ${response.status} ${response.statusText} - ${text}`,
+			);
+		}
+
+		const json = (await response.json()) as {
+			data: { SessionTicket: string; PlayFabId: string };
+		};
+		return {
+			sessionTicket: json.data.SessionTicket,
+			playFabId: json.data.PlayFabId,
+		};
+	} catch (error) {
+		Logger.error(
+			`Error while getting Playfab session ticket: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+async function getMinecraftServicesTokenFromPlayfab(
+	sessionTicket: string,
+): Promise<string> {
+	try {
+		const response = await fetch(
+			"https://authorization.franchise.minecraft-services.net/api/v1.0/session/start",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					device: {
+						applicationType: "MinecraftPE",
+						gameVersion: "1.21.130",
+						id: "c1681ad3-415e-30cd-abd3-3b8f51e771d1",
+						memory: String(8 * (1024 * 1024 * 1024)),
+						platform: "Windows10",
+						playFabTitleId: "20CA2",
+						storePlatform: "uwp.store",
+						type: "Windows10",
+					},
+					user: {
+						token: sessionTicket,
+						tokenType: "PlayFab",
+					},
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const text = await response.text();
+			throw new Error(
+				`MC services token failed: ${response.status} ${response.statusText} - ${text}`,
+			);
+		}
+
+		const json = (await response.json()) as {
+			result: { authorizationHeader: string };
+		};
+		
+		return json.result.authorizationHeader;
+	} catch (error) {
+		Logger.error(
+			`Error while getting MC services token: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+async function getMultiplayerSessionTokenFromMcToken(
+	mcToken: string,
+	publicKey: string,
+): Promise<string> {
+	try {
+		const response = await fetch(
+			"https://authorization.franchise.minecraft-services.net/api/v1.0/multiplayer/session/start",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: mcToken,
+					"Accept-Encoding": "identity",
+				},
+				body: JSON.stringify({
+					publicKey: publicKey,
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const text = await response.text();
+			throw new Error(
+				`Multiplayer session start failed: ${response.status} ${response.statusText} - ${text}`,
+			);
+		}
+
+		const json = (await response.json()) as {
+			result: { signedToken: string };
+		};
+		
+		return json.result.signedToken;
+	} catch (error) {
+		Logger.error(
+			`Error while getting Multiplayer Session Token: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		throw error;
+	}
+}
+
+async function getMultiplayerSessionTokenFromXsts(
+	sessionTicket: string,
+	publicKey: string,
+): Promise<string> {
+	try {
+		const response = await fetch(
+			"https://authorization.franchise.minecraft-services.net/api/v1.0/session/start",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					device: {
+						applicationType: "MinecraftPE",
+						gameVersion: "1.21.130",
+						id: "c1681ad3-415e-30cd-abd3-3b8f51e771d1",
+						memory: String(8 * (1024 * 1024 * 1024)),
+						platform: "Windows10",
+						playFabTitleId: "20CA2",
+						storePlatform: "uwp.store",
+						type: "Windows10",
+					},
+					user: {
+						token: sessionTicket,
+						tokenType: "PlayFab",
+					},
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const text = await response.text();
+			throw new Error(
+				`Multiplayer session start failed: ${response.status} ${response.statusText} - ${text}`,
+			);
+		}
+
+		const json = (await response.json()) as {
+			result: { authorizationHeader: string };
+		};
+		
+		return json.result.authorizationHeader;
 	} catch (error) {
 		Logger.error(
 			`Error while getting Multiplayer Session Token: ${error instanceof Error ? error.message : String(error)}`,

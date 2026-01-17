@@ -52,7 +52,7 @@ class ClientData {
 		mojangKey: string | null,
 		offline: boolean,
 	): Promise<string> {
-		const { clientX509, ecdhKeyPair } = this.loginData;
+		const { clientX509, ecdhKeyPair, sessionTokenData } = this.loginData;
 		let payload: Record<string, unknown>;
 		let header: jose.JWTHeaderParameters;
 
@@ -80,6 +80,22 @@ class ClientData {
 				identityPublicKey: mojangKey || PUBLIC_KEY,
 				certificateAuthority: true,
 			};
+			
+			// Add session token data for PocketMine 1.21.100+ compatibility
+			if (sessionTokenData) {
+				payload.ipt = sessionTokenData.ipt;
+				payload.tid = sessionTokenData.tid;
+				payload.mid = sessionTokenData.mid;
+				payload.xid = sessionTokenData.xid;
+				payload.cpk = sessionTokenData.cpk;
+				payload.xname = this.client.profile.name;
+			}
+			
+			// Add pfcd if available (PlayFab ID)
+			if (this.payload.pfcd) {
+				payload.pfcd = this.payload.pfcd;
+			}
+			
 			header = {
 				alg: algorithm as "ES384",
 				x5u: clientX509,

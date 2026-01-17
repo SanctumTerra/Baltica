@@ -132,6 +132,10 @@ export class Client extends Emitter<ClientEvents> {
 		this.handleGamePackets();
 
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
+		
+		// Wait for authentication to complete before sending network settings request
+		await this.waitForSessionReady();
+		
 		const request = new RequestNetworkSettingsPacket();
 		request.protocol = ProtocolList[CurrentVersionConst];
 		this.send(request);
