@@ -2,7 +2,7 @@ import {
 	type Advertisement,
 	type ClientEvents,
 	type ClientOptions,
-	defaultClientOptions,
+	createDefaultClientOptions,
 	type Frame,
 	Priority,
 	EventEmitter as Emitter,
@@ -17,7 +17,7 @@ class WorkerClient extends Emitter<ClientEvents> {
 
 	constructor(options: Partial<ClientOptions>) {
 		super();
-		this._options = { ...defaultClientOptions, ...options };
+		this._options = { ...createDefaultClientOptions(), ...options };
 		this._worker = connect(this._options);
 		this.handleEvents();
 	}

@@ -1,9 +1,9 @@
 /**
  * Xbox Live Authentication Module
- * 
+ *
  * Based on the authentication flow from @xboxreplay/xboxlive-auth
  * https://github.com/XboxReplay/xboxlive-auth
- * 
+ *
  * Modified to support SOCKS5 proxies for all HTTP requests and Minecraft Authentication
  */
 
@@ -11,7 +11,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Logger } from "@sanctumterra/raknet";
 import { socksDispatcher } from "fetch-socks";
-import { fetch as undiciFetch, type RequestInit as UndiciRequestInit } from "undici";
+import {
+	fetch as undiciFetch,
+	type RequestInit as UndiciRequestInit,
+} from "undici";
 
 export interface BedrockTokens {
 	chains: string[];
@@ -53,7 +56,10 @@ interface XboxTokenResponse {
 const MINECRAFT_BEDROCK_RELYING_PARTY = "https://multiplayer.minecraft.net/";
 const XBOX_AUTH_CLIENT_ID = "00000000441cc96b";
 
-type ProxiedFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
+type ProxiedFetch = (
+	input: string | URL,
+	init?: RequestInit,
+) => Promise<Response>;
 
 function hashString(str: string): string {
 	let hash = 0;
@@ -136,7 +142,6 @@ function createProxiedFetch(proxy?: ProxyOptions): ProxiedFetch {
 	};
 }
 
-
 /**
  * Authenticates with Xbox Live using email/password and obtains Minecraft Bedrock tokens
  * Supports SOCKS5 proxy for all authentication requests
@@ -152,10 +157,12 @@ export async function authenticateWithCredentials(
 	if (proxy) {
 		try {
 			const ipResp = await proxiedFetch("https://api.ipify.org?format=json");
-			const ipData = await ipResp.json() as { ip: string };
+			const ipData = (await ipResp.json()) as { ip: string };
 			Logger.info(`Proxy IP verified: ${ipData.ip}`);
 		} catch (e) {
-			Logger.warn(`Could not verify proxy IP: ${e instanceof Error ? e.message : String(e)}`);
+			Logger.warn(
+				`Could not verify proxy IP: ${e instanceof Error ? e.message : String(e)}`,
+			);
 		}
 	}
 
@@ -168,11 +175,20 @@ export async function authenticateWithCredentials(
 		userToken = cached.userToken;
 		userHash = cached.userHash;
 	} else {
-		Logger.info(`Authenticating with Xbox Live...${proxy ? ` (via proxy ${proxy.host}:${proxy.port})` : ""}`);
+		Logger.info(
+			`Authenticating with Xbox Live...${proxy ? ` (via proxy ${proxy.host}:${proxy.port})` : ""}`,
+		);
 
-		const accessToken = await getMicrosoftAccessToken(email, password, proxiedFetch);
+		const accessToken = await getMicrosoftAccessToken(
+			email,
+			password,
+			proxiedFetch,
+		);
 
-		const userTokenResp = await exchangeRpsTicketForUserToken(accessToken, proxiedFetch);
+		const userTokenResp = await exchangeRpsTicketForUserToken(
+			accessToken,
+			proxiedFetch,
+		);
 		userToken = userTokenResp.Token;
 		userHash = userTokenResp.DisplayClaims.xui[0].uhs;
 
@@ -222,8 +238,10 @@ async function getMicrosoftAccessToken(
 
 	const preAuthResp = await proxiedFetch(`${authUrl}?${params}`, {
 		headers: {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-			Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+			"User-Agent":
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+			Accept:
+				"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
 			"Accept-Language": "en-US,en;q=0.5",
 		},
 	});
@@ -259,7 +277,8 @@ async function getMicrosoftAccessToken(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/x-www-form-urlencoded",
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+			"User-Agent":
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 			Cookie: cookies,
 			Referer: `${authUrl}?${params}`,
 			Origin: "https://login.live.com",
@@ -270,26 +289,34 @@ async function getMicrosoftAccessToken(
 
 	// Check for access token in redirect
 	let location = loginResp.headers.get("location") || "";
-	
+
 	// Follow redirects manually to find the access token
 	let attempts = 0;
 	while (attempts < 5 && !location.includes("access_token=")) {
 		if (!location) {
 			// Check if we got an error page
 			const responseText = await loginResp.text();
-			if (responseText.includes("sErrTxt") || responseText.includes("Your account or password is incorrect")) {
+			if (
+				responseText.includes("sErrTxt") ||
+				responseText.includes("Your account or password is incorrect")
+			) {
 				throw new Error("Invalid credentials");
 			}
-			if (responseText.includes("Sign in a different way") || responseText.includes("idA_PWD_SwitchToCredPicker")) {
-				throw new Error("2FA is enabled on this account. Direct login requires 2FA to be disabled.");
+			if (
+				responseText.includes("Sign in a different way") ||
+				responseText.includes("idA_PWD_SwitchToCredPicker")
+			) {
+				throw new Error(
+					"2FA is enabled on this account. Direct login requires 2FA to be disabled.",
+				);
 			}
-			
+
 			// Try to extract access token from response body (some flows embed it)
 			const tokenMatch = responseText.match(/access_token=([^&"']+)/);
 			if (tokenMatch) {
 				return decodeURIComponent(tokenMatch[1]);
 			}
-			
+
 			throw new Error("Failed to get redirect URL from login response");
 		}
 
@@ -299,7 +326,8 @@ async function getMicrosoftAccessToken(
 
 		const redirectResp = await proxiedFetch(location, {
 			headers: {
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 				Cookie: cookies,
 			},
 			redirect: "manual",
@@ -317,11 +345,10 @@ async function getMicrosoftAccessToken(
 	throw new Error("Failed to obtain access token from Microsoft");
 }
 
-
 function extractCookies(headers: Headers): string {
 	const setCookies = headers.get("set-cookie");
 	if (!setCookies) return "";
-	
+
 	// Parse and combine cookies
 	const cookies: string[] = [];
 	const cookieStrings = setCookies.split(/,(?=[^;]*=)/);
@@ -394,27 +421,32 @@ async function exchangeRpsTicketForUserToken(
 	accessToken: string,
 	proxiedFetch: ProxiedFetch,
 ): Promise<XboxTokenResponse> {
-	const response = await proxiedFetch("https://user.auth.xboxlive.com/user/authenticate", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Accept: "application/json",
-			"x-xbl-contract-version": "1",
-		},
-		body: JSON.stringify({
-			RelyingParty: "http://auth.xboxlive.com",
-			TokenType: "JWT",
-			Properties: {
-				AuthMethod: "RPS",
-				SiteName: "user.auth.xboxlive.com",
-				RpsTicket: `t=${accessToken}`,
+	const response = await proxiedFetch(
+		"https://user.auth.xboxlive.com/user/authenticate",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+				"x-xbl-contract-version": "1",
 			},
-		}),
-	});
+			body: JSON.stringify({
+				RelyingParty: "http://auth.xboxlive.com",
+				TokenType: "JWT",
+				Properties: {
+					AuthMethod: "RPS",
+					SiteName: "user.auth.xboxlive.com",
+					RpsTicket: `t=${accessToken}`,
+				},
+			}),
+		},
+	);
 
 	if (!response.ok) {
 		const text = await response.text();
-		throw new Error(`Xbox user token exchange failed: ${response.status} - ${text}`);
+		throw new Error(
+			`Xbox user token exchange failed: ${response.status} - ${text}`,
+		);
 	}
 
 	return response.json() as Promise<XboxTokenResponse>;
@@ -428,26 +460,31 @@ async function exchangeTokenForXSTSToken(
 	relyingParty: string,
 	proxiedFetch: ProxiedFetch,
 ): Promise<XboxTokenResponse> {
-	const response = await proxiedFetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Accept: "application/json",
-			"x-xbl-contract-version": "1",
-		},
-		body: JSON.stringify({
-			RelyingParty: relyingParty,
-			TokenType: "JWT",
-			Properties: {
-				SandboxId: "RETAIL",
-				UserTokens: [userToken],
+	const response = await proxiedFetch(
+		"https://xsts.auth.xboxlive.com/xsts/authorize",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+				"x-xbl-contract-version": "1",
 			},
-		}),
-	});
+			body: JSON.stringify({
+				RelyingParty: relyingParty,
+				TokenType: "JWT",
+				Properties: {
+					SandboxId: "RETAIL",
+					UserTokens: [userToken],
+				},
+			}),
+		},
+	);
 
 	if (!response.ok) {
 		const text = await response.text();
-		throw new Error(`Xbox XSTS token exchange failed: ${response.status} - ${text}`);
+		throw new Error(
+			`Xbox XSTS token exchange failed: ${response.status} - ${text}`,
+		);
 	}
 
 	return response.json() as Promise<XboxTokenResponse>;
@@ -483,7 +520,9 @@ async function getMinecraftBedrockChains(
 					"The account may not have an Xbox profile or Minecraft Bedrock Edition.",
 			);
 		}
-		throw new Error(`Minecraft Bedrock auth failed: ${response.status} - ${text}`);
+		throw new Error(
+			`Minecraft Bedrock auth failed: ${response.status} - ${text}`,
+		);
 	}
 
 	const data = (await response.json()) as { chain: string[] };
