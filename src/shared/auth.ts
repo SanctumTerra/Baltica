@@ -111,20 +111,22 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 		const mcToken = await getMinecraftServicesTokenFromPlayfab(
 			playfabData.sessionTicket,
 		);
-		
+
 		// Then use mcToken to get the multiplayer session token
 		const sessionToken = await getMultiplayerSessionTokenFromMcToken(
 			mcToken,
 			client.data.loginData.clientX509,
 		);
-		
+
 		client.data.loginToken = sessionToken;
-		
+
 		// Extract pfcd from session token and store it
 		try {
 			const tokenParts = sessionToken.split(".");
 			if (tokenParts.length >= 2) {
-				const payload = JSON.parse(Buffer.from(tokenParts[1], "base64").toString());
+				const payload = JSON.parse(
+					Buffer.from(tokenParts[1], "base64").toString(),
+				);
 				if (payload.pfcd) {
 					client.data.payload.pfcd = payload.pfcd;
 				}
@@ -138,7 +140,9 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 				};
 			}
 		} catch (e) {
-			Logger.warn(`Failed to extract pfcd from session token: ${e instanceof Error ? e.message : String(e)}`);
+			Logger.warn(
+				`Failed to extract pfcd from session token: ${e instanceof Error ? e.message : String(e)}`,
+			);
 		}
 
 		const endTime = Date.now();
@@ -298,7 +302,7 @@ async function getMinecraftServicesTokenFromPlayfab(
 		const json = (await response.json()) as {
 			result: { authorizationHeader: string };
 		};
-		
+
 		return json.result.authorizationHeader;
 	} catch (error) {
 		Logger.error(
@@ -338,7 +342,7 @@ async function getMultiplayerSessionTokenFromMcToken(
 		const json = (await response.json()) as {
 			result: { signedToken: string };
 		};
-		
+
 		return json.result.signedToken;
 	} catch (error) {
 		Logger.error(
@@ -387,7 +391,7 @@ async function getMultiplayerSessionTokenFromXsts(
 		const json = (await response.json()) as {
 			result: { authorizationHeader: string };
 		};
-		
+
 		return json.result.authorizationHeader;
 	} catch (error) {
 		Logger.error(

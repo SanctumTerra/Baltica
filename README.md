@@ -91,6 +91,7 @@ const client = new Client({
     userId: "proxy-username",    // Optional
     password: "proxy-password",  // Optional
   },
+  skinFile: `./skins/skin.png`, // If you want to load a skin from a png file
 });
 
 await client.connect();

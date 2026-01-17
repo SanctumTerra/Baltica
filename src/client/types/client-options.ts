@@ -35,6 +35,8 @@ export type ClientOptions = {
 	tokensFolder: string;
 	/** Skin Data for custom skins (By default we parse it from json)*/
 	skinData: SkinData | undefined;
+	/** Path to PNG skin file (alternative to skinData) */
+	skinFile: string | undefined;
 	/** LoginPacket data Customization */
 	loginOptions: LoginPacketOptions;
 	/** The View Distance of the client.  */
@@ -78,6 +80,8 @@ export const defaultClientOptions: ClientOptions = {
 	tokensFolder: "tokens",
 	/** Default Value: undefined */
 	skinData: undefined,
+	/** Default Value: undefined */
+	skinFile: undefined,
 	loginOptions: {
 		/** Default Value: Unknown */
 		currentInputMode: InputMode.Unknown,

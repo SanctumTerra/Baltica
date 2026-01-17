@@ -6,6 +6,7 @@ import { v3 as uuidv3 } from "uuid-1345";
 import { type Client, createDefaultPayload, type Payload } from "../";
 import { CurrentVersionConst, ProtocolList } from "../../shared/types";
 import { type LoginData, prepareLoginData } from "./login-data";
+import { loadSkinFromPNG } from "../skin-loader";
 
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
@@ -29,6 +30,11 @@ class ClientData {
 		this.client = client;
 		this.payload = createDefaultPayload(client);
 		this.loginData = prepareLoginData();
+
+		// Load skin from file if skinFile is provided
+		if (client.options.skinFile && !client.options.skinData) {
+			client.options.skinData = loadSkinFromPNG(client.options.skinFile);
+		}
 	}
 
 	public createLoginPacket(): LoginPacket {
@@ -80,7 +86,7 @@ class ClientData {
 				identityPublicKey: mojangKey || PUBLIC_KEY,
 				certificateAuthority: true,
 			};
-			
+
 			// Add session token data for PocketMine 1.21.100+ compatibility
 			if (sessionTokenData) {
 				payload.ipt = sessionTokenData.ipt;
@@ -90,12 +96,12 @@ class ClientData {
 				payload.cpk = sessionTokenData.cpk;
 				payload.xname = this.client.profile.name;
 			}
-			
+
 			// Add pfcd if available (PlayFab ID)
 			if (this.payload.pfcd) {
 				payload.pfcd = this.payload.pfcd;
 			}
-			
+
 			header = {
 				alg: algorithm as "ES384",
 				x5u: clientX509,

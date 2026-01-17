@@ -1,7 +1,7 @@
 {
   "name": "baltica",
   "description": "Library for Minecraft Bedrock Edition community developers.",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "minecraft": "1.21.130",
   "main": "dist/index.js",
   "license": "MIT",
@@ -33,7 +33,9 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^22.19.7",
+    "@types/pngjs": "^6.0.5",
     "@types/uuid-1345": "^0.99.25",
+    "pngjs": "^7.0.0",
     "typescript": "^5.9.3"
   }
 }
