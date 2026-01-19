@@ -57,15 +57,15 @@ async function authenticate(client: Client): Promise<void> {
 		const sessionToken = await getMultiplayerSessionToken(authflow, client);
 		client.data.loginToken = sessionToken;
 
+		await setupClientProfile(client, profile, chains);
+		await setupClientChains(client);
+
 		const endTime = Date.now();
 		Logger.info(
 			`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
 		);
 
-		await setupClientProfile(client, profile, chains);
-		setupClientChains(client).then((value) => {
-			client.emit("session");
-		});
+		client.emit("session");
 	} catch (error) {
 		Logger.error(
 			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,

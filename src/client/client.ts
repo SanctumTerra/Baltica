@@ -116,15 +116,18 @@ export class Client extends Emitter<ClientEvents> {
 		this.data = new ClientData(this);
 
 		this.raknet.on("disconnect", () => this.cleanup());
-
-		this.once("session", () => {
-			this.sessionReady = true;
-		});
-		this.options.offline ? createOfflineSession(this) : authenticate(this);
 	}
 
 	/** Connect to the server and start sending/receiving packets. */
 	async connect(): Promise<[StartGamePacket]> {
+		// Authenticate first before connecting to raknet
+		if (this.options.offline) {
+			await createOfflineSession(this);
+		} else {
+			await authenticate(this);
+		}
+		this.sessionReady = true;
+
 		await this.raknet.connect();
 
 		this.status = ConnectionStatus.Connecting;
@@ -132,9 +135,6 @@ export class Client extends Emitter<ClientEvents> {
 		this.handleGamePackets();
 
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
-
-		// Wait for authentication to complete before sending network settings request
-		await this.waitForSessionReady();
 
 		const request = new RequestNetworkSettingsPacket();
 		request.protocol = ProtocolList[CurrentVersionConst];
@@ -205,7 +205,6 @@ export class Client extends Emitter<ClientEvents> {
 				packet.compressionMethod,
 			);
 			this.options.compressionThreshold = packet.compressionThreshold;
-			await this.waitForSessionReady();
 			const loginPacket = this.data.createLoginPacket();
 			this.send(loginPacket);
 		});
@@ -314,12 +313,6 @@ export class Client extends Emitter<ClientEvents> {
 	public startEncryption(iv: Buffer): void {
 		this.packetEncryptor = new PacketEncryptor(this, iv);
 		this._encryptionEnabled = true;
-	}
-
-	private async waitForSessionReady(): Promise<void> {
-		while (!this.sessionReady) {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
 	}
 
 	/**
