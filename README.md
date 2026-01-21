@@ -32,6 +32,7 @@ Complete rewrite, from the ground up! Here's what makes it awesome:
 
 `0.1.13` → Minecraft Bedrock `1.21.113`
 
+`0.1.26` → Minecraft Bedrock `1.21.130` & `1.21.132`
 
 *Note: We dropped multi-version support because honestly, it was more trouble than it was worth. One version, done right.*
 
