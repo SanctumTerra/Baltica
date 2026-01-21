@@ -309,10 +309,11 @@ async function getMicrosoftAccessToken(
 
 	// Check for access token in redirect
 	let location = loginResp.headers.get("location") || "";
+	const allCookies = `${cookies}; ${extractCookies(loginResp.headers)}`;
 
 	// Follow redirects manually to find the access token
 	let attempts = 0;
-	while (attempts < 5 && !location.includes("access_token=")) {
+	while (attempts < 10 && !location.includes("access_token=")) {
 		if (!location) {
 			// Check if we got an error page
 			const responseText = await loginResp.text();
@@ -330,6 +331,19 @@ async function getMicrosoftAccessToken(
 					"2FA is enabled on this account. Direct login requires 2FA to be disabled.",
 				);
 			}
+			if (responseText.includes("identity/confirm")) {
+				throw new Error(
+					"Microsoft requires identity confirmation. Please log in via browser first.",
+				);
+			}
+			if (
+				responseText.includes("recover?") ||
+				responseText.includes("account.live.com/recover")
+			) {
+				throw new Error(
+					"Microsoft requires account recovery. Please verify your account via browser.",
+				);
+			}
 
 			// Try to extract access token from response body (some flows embed it)
 			const tokenMatch = responseText.match(/access_token=([^&"']+)/);
@@ -337,7 +351,19 @@ async function getMicrosoftAccessToken(
 				return decodeURIComponent(tokenMatch[1]);
 			}
 
-			throw new Error("Failed to get redirect URL from login response");
+			// Check for urlPost redirect in response (sometimes login returns another form)
+			const urlPostMatch = responseText.match(/urlPost:\s*'([^']+)'/);
+			if (urlPostMatch) {
+				location = urlPostMatch[1];
+				attempts++;
+				continue;
+			}
+
+			throw new Error(
+				"Failed to get redirect URL from login response. " +
+					"This can happen due to rate limiting, CAPTCHA, or security challenges. " +
+					"Try again in a few minutes or log in via browser first.",
+			);
 		}
 
 		if (location.includes("access_token=")) {
@@ -348,11 +374,22 @@ async function getMicrosoftAccessToken(
 			headers: {
 				"User-Agent":
 					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-				Cookie: cookies,
+				Cookie: allCookies,
 			},
 			redirect: "manual",
 		});
-		location = redirectResp.headers.get("location") || "";
+
+		// Check response body for token if no redirect
+		const newLocation = redirectResp.headers.get("location") || "";
+		if (!newLocation && !newLocation.includes("access_token=")) {
+			const body = await redirectResp.text();
+			const tokenMatch = body.match(/access_token=([^&"']+)/);
+			if (tokenMatch) {
+				return decodeURIComponent(tokenMatch[1]);
+			}
+		}
+
+		location = newLocation;
 		attempts++;
 	}
 
