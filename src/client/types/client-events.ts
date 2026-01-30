@@ -9,6 +9,7 @@ type ClientEvents = {
 	packet: [packet: InstanceType<(typeof Protocol)[PacketNames]>];
 	connect: [];
 	disconnect: [reason?: string];
+	error: [error: Error];
 } & {
 	[K in `${number}`]: [buffer: Buffer];
 };

@@ -34,9 +34,9 @@ async function createOfflineSession(client: Client): Promise<void> {
 		client.emit("session");
 		Logger.info("Offline session created");
 	} catch (error) {
-		Logger.error(
-			`Error while creating offline session: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		const err = error instanceof Error ? error : new Error(String(error));
+		Logger.error(`Error while creating offline session: ${err.message}`);
+		client.emit("error", err);
 		throw error;
 	}
 }
@@ -67,9 +67,9 @@ async function authenticate(client: Client): Promise<void> {
 
 		client.emit("session");
 	} catch (error) {
-		Logger.error(
-			`Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		const err = error instanceof Error ? error : new Error(String(error));
+		Logger.error(`Authentication failed: ${err.message}`);
+		client.emit("error", err);
 		throw error;
 	}
 }
@@ -154,10 +154,10 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 		await setupClientChains(client);
 		client.emit("session");
 	} catch (error) {
-		Logger.error(
-			`Email/password authentication failed: ${error instanceof Error ? error.message : String(error)}`,
-		);
-		Logger.warn("Make sure you have an xbox profile crated!");
+		const err = error instanceof Error ? error : new Error(String(error));
+		Logger.error(`Email/password authentication failed: ${err.message}`);
+		Logger.warn("Make sure you have an xbox profile created!");
+		client.emit("error", err);
 		throw error;
 	}
 }

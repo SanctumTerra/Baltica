@@ -121,10 +121,16 @@ export class Client extends Emitter<ClientEvents> {
 	/** Connect to the server and start sending/receiving packets. */
 	async connect(): Promise<[StartGamePacket]> {
 		// Authenticate first before connecting to raknet
-		if (this.options.offline) {
-			await createOfflineSession(this);
-		} else {
-			await authenticate(this);
+		try {
+			if (this.options.offline) {
+				await createOfflineSession(this);
+			} else {
+				await authenticate(this);
+			}
+		} catch (error) {
+			// Clean up raknet on auth failure to prevent hanging process
+			this.destroy();
+			throw error;
 		}
 		this.sessionReady = true;
 
@@ -352,5 +358,21 @@ export class Client extends Emitter<ClientEvents> {
 			`Queueing packet ${packet instanceof DataPacket ? packet.constructor.name : "Buffer"}`,
 		);
 		this.sendPacket(packet, Priority.High);
+	}
+
+	/** Fully destroy the client and clean up all resources */
+	public destroy(): void {
+		this.cleanup();
+		if (this.raknet instanceof WorkerClient) {
+			this.raknet.dispose();
+		} else {
+			// RaknetClient - call disconnect which should clean up internal timers
+			try {
+				this.raknet.disconnect();
+			} catch {
+				// Ignore errors during cleanup
+			}
+		}
+		super.destroy();
 	}
 }

@@ -5,4 +5,5 @@ export type ServerEvents = {
 	connection: [Connection];
 	playerConnect: [Player];
 	disconnect: [string, Player];
+	error: [error: Error];
 };
