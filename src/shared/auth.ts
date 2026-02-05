@@ -22,8 +22,7 @@ async function createOfflineSession(client: Client): Promise<void> {
 		if (!client.options.username) {
 			throw new Error("Must specify a valid username for offline session");
 		}
-		if (client.options.authLogs)
-			Logger.info("Creating offline session...");
+		if (client.options.authLogs) Logger.info("Creating offline session...");
 		const profile: Profile = {
 			name: client.options.username,
 			uuid: generateUUID(client.options.username),
@@ -33,8 +32,7 @@ async function createOfflineSession(client: Client): Promise<void> {
 		await setupClientProfile(client, profile, []);
 		await setupClientChains(client, true);
 		client.emit("session");
-		if (client.options.authLogs)
-			Logger.info("Offline session created");
+		if (client.options.authLogs) Logger.info("Offline session created");
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error));
 		Logger.error(`Error while creating offline session: ${err.message}`);
@@ -453,9 +451,8 @@ function createAuthflow(client: Client): Authflow {
 			deviceType: "Nintendo",
 		},
 		(res: { message: string }) => {
-			client.emit("msa", res.message)
-			if (client.options.authLogs)
-				Logger.info(res.message);
+			client.emit("msa", res.message);
+			if (client.options.authLogs) Logger.info(res.message);
 		},
 	);
 }

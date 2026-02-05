@@ -63,7 +63,7 @@ export type ClientOptions = {
 		password?: string;
 	};
 	/** Whether to log the auth messages */
-	authLogs: boolean,
+	authLogs: boolean;
 };
 
 /** Default Client Options */
