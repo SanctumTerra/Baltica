@@ -141,7 +141,7 @@ function createProxiedFetch(proxy?: ProxyOptions): ProxiedFetch {
 		const response = await undiciFetch(url, {
 			...init,
 			dispatcher,
-		} as UndiciRequestInit);
+		} as any);
 		return response as unknown as Response;
 	};
 }
