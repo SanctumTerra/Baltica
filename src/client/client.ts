@@ -142,6 +142,8 @@ export class Client extends Emitter<ClientEvents> {
 
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
 
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
 		const request = new RequestNetworkSettingsPacket();
 		request.protocol = ProtocolList[CurrentVersionConst];
 		this.send(request);
