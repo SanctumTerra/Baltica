@@ -22,7 +22,8 @@ async function createOfflineSession(client: Client): Promise<void> {
 		if (!client.options.username) {
 			throw new Error("Must specify a valid username for offline session");
 		}
-		Logger.info("Creating offline session...");
+		if (client.options.authLogs)
+			Logger.info("Creating offline session...");
 		const profile: Profile = {
 			name: client.options.username,
 			uuid: generateUUID(client.options.username),
@@ -32,7 +33,8 @@ async function createOfflineSession(client: Client): Promise<void> {
 		await setupClientProfile(client, profile, []);
 		await setupClientChains(client, true);
 		client.emit("session");
-		Logger.info("Offline session created");
+		if (client.options.authLogs)
+			Logger.info("Offline session created");
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error));
 		Logger.error(`Error while creating offline session: ${err.message}`);
@@ -61,9 +63,10 @@ async function authenticate(client: Client): Promise<void> {
 		await setupClientChains(client);
 
 		const endTime = Date.now();
-		Logger.info(
-			`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
-		);
+		if (client.options.authLogs)
+			Logger.info(
+				`Authentication with Xbox took ${(endTime - startTime) / 1000}s.`,
+			);
 
 		client.emit("session");
 	} catch (error) {
@@ -146,9 +149,10 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 		}
 
 		const endTime = Date.now();
-		Logger.info(
-			`Authentication with Xbox (email/password) took ${(endTime - startTime) / 1000}s.`,
-		);
+		if (client.options.authLogs)
+			Logger.info(
+				`Authentication with Xbox (email/password) took ${(endTime - startTime) / 1000}s.`,
+			);
 
 		setupClientProfile(client, profile, tokens.chains);
 		await setupClientChains(client);
@@ -449,7 +453,9 @@ function createAuthflow(client: Client): Authflow {
 			deviceType: "Nintendo",
 		},
 		(res: { message: string }) => {
-			Logger.info(res.message);
+			client.emit("msa", res.message)
+			if (client.options.authLogs)
+				Logger.info(res.message);
 		},
 	);
 }

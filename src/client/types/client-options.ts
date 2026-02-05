@@ -62,6 +62,8 @@ export type ClientOptions = {
 		/** Proxy Password */
 		password?: string;
 	};
+	/** Whether to log the auth messages */
+	authLogs: boolean,
 };
 
 /** Default Client Options */
@@ -106,6 +108,8 @@ export const defaultClientOptions: ClientOptions = {
 	compressionThreshold: 1,
 	/** Default Value: Zlib */
 	compressionMethod: CompressionMethod.Zlib,
-	/** Default Value: false */
-	emitUnknownPackets: false,
+	/** Default Value: true */
+	emitUnknownPackets: true,
+	/** Default Value: true */
+	authLogs: true,
 };

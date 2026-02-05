@@ -10,6 +10,7 @@ type ClientEvents = {
 	connect: [];
 	disconnect: [reason?: string];
 	error: [error: Error];
+	msa: [message: string];
 } & {
 	[K in `${number}`]: [buffer: Buffer];
 };
