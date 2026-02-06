@@ -1,7 +1,7 @@
 import { Logger } from "@sanctumterra/raknet";
 import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import * as jose from "jose";
-import { createECDH, type KeyExportOptions, KeyObject } from "node:crypto";
+import { createECDH, type KeyExportOptions, KeyObject, randomUUID } from "node:crypto";
 import { v3 as uuidv3 } from "uuid-1345";
 import { type Client, createDefaultPayload, type Payload } from "../";
 import { CurrentVersionConst, ProtocolList } from "../../shared/types";
@@ -11,6 +11,7 @@ import { loadSkinFromPNG } from "../skin-loader";
 const PUBLIC_KEY =
 	"MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
 const algorithm = "ES384";
+const UUID_NAMESPACE = randomUUID();
 
 class ClientData {
 	public client: Client; // | Player;
@@ -210,7 +211,7 @@ class ClientData {
 
 	public static nextUUID(username: string) {
 		return uuidv3({
-			namespace: "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+			namespace: UUID_NAMESPACE,
 			name: username,
 		});
 	}
