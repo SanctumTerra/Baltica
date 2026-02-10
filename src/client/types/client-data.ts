@@ -1,7 +1,12 @@
 import { Logger } from "@sanctumterra/raknet";
 import { LoginPacket, LoginTokens } from "@serenityjs/protocol";
 import * as jose from "jose";
-import { createECDH, type KeyExportOptions, KeyObject, randomUUID } from "node:crypto";
+import {
+	createECDH,
+	type KeyExportOptions,
+	KeyObject,
+	randomUUID,
+} from "node:crypto";
 import { v3 as uuidv3 } from "uuid-1345";
 import { type Client, createDefaultPayload, type Payload } from "../";
 import { CurrentVersionConst, ProtocolList } from "../../shared/types";
