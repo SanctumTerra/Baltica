@@ -23,6 +23,13 @@ import {
 	ServerboundLoadingScreenType,
 	SetLocalPlayerAsInitializedPacket,
 	type StartGamePacket,
+	ActorEvent,
+	PlayerActionPacket,
+	PlayerActionType,
+	RespawnPacket,
+	RespawnState,
+	Vector3f,
+	type ActorEventPacket,
 } from "@serenityjs/protocol";
 
 import {
@@ -106,11 +113,13 @@ export class Client extends Emitter<ClientEvents> {
 					address: this.options.address,
 					port: this.options.port,
 					proxy: this.options.proxy,
+					debug: this.options.debug,
 				})
 			: new RaknetClient({
 					address: this.options.address,
 					port: this.options.port,
 					proxy: this.options.proxy,
+					debug: this.options.debug,
 				});
 		/** Create ClientData to store and handle auth data */
 		this.data = new ClientData(this);
@@ -141,6 +150,8 @@ export class Client extends Emitter<ClientEvents> {
 		this.handleGamePackets();
 
 		this.raknet.on("encapsulated", this.handleEncapsulated.bind(this));
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
 
 		const request = new RequestNetworkSettingsPacket();
 		request.protocol = ProtocolList[CurrentVersionConst];
@@ -298,6 +309,61 @@ export class Client extends Emitter<ClientEvents> {
 		});
 		this.on("DisconnectPacket", (packet) => {
 			this.disconnect(packet.message.message ?? undefined);
+		});
+
+		// Respawn handling
+		this.on("ActorEventPacket", async (packet: ActorEventPacket) => {
+			if (
+				packet.actorRuntimeId !== this.startGameData.runtimeEntityId ||
+				packet.event !== ActorEvent.Death
+			)
+				return;
+
+			// Wait a bit before requesting respawn
+			await new Promise((resolve) => setTimeout(resolve, 200));
+
+			const respawn = new RespawnPacket();
+			respawn.state = RespawnState.ClientReadyToSpawn;
+			respawn.position = new Vector3f(0, 0, 0);
+			respawn.runtimeEntityId = packet.actorRuntimeId;
+			this.send(respawn);
+
+			await new Promise((resolve) => setTimeout(resolve, 200));
+
+			const action = new PlayerActionPacket();
+			action.action = PlayerActionType.Respawn;
+			action.blockPosition = new Vector3f(0, 0, 0);
+			action.resultPosition = new Vector3f(0, 0, 0);
+			action.face = -1;
+			action.entityRuntimeId = this.startGameData.runtimeEntityId;
+			this.send(action);
+		});
+
+		this.on("RespawnPacket", (packet: RespawnPacket) => {
+			if (packet.state !== RespawnState.ServerReadyToSpawn) return;
+
+			const request = new RequestChunkRadiusPacket();
+			request.maxRadius = this.options.viewDistance;
+			request.radius = this.options.viewDistance;
+			this.send(request);
+
+			const screen1 = new ServerboundLoadingScreenPacketPacket();
+			screen1.hasScreenId = false;
+			screen1.type = ServerboundLoadingScreenType.StartLoadingScreen;
+			this.send(screen1);
+
+			const action = new PlayerActionPacket();
+			action.action = PlayerActionType.Respawn;
+			action.entityRuntimeId = this.startGameData.runtimeEntityId;
+			action.blockPosition = new Vector3f(0, 0, 0);
+			action.resultPosition = new Vector3f(0, 0, 0);
+			action.face = -1;
+			this.send(action);
+
+			const screen2 = new ServerboundLoadingScreenPacketPacket();
+			screen2.hasScreenId = false;
+			screen2.type = ServerboundLoadingScreenType.EndLoadingScreen;
+			this.send(screen2);
 		});
 	}
 

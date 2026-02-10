@@ -47,6 +47,8 @@ export type ClientOptions = {
 	compressionMethod: CompressionMethod;
 	/** Whether to emit unknown packets as buffer */
 	emitUnknownPackets: boolean;
+	/** Enable debug logging */
+	debug?: boolean;
 	/** Email for direct email/password authentication (requires 2FA disabled) */
 	email?: string;
 	/** Password for direct email/password authentication (requires 2FA disabled) */
@@ -110,6 +112,8 @@ export const defaultClientOptions: ClientOptions = {
 	compressionMethod: CompressionMethod.Zlib,
 	/** Default Value: true */
 	emitUnknownPackets: true,
+	/** Default Value: false */
+	debug: false,
 	/** Default Value: true */
 	authLogs: true,
 };
