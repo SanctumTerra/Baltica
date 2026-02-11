@@ -312,6 +312,8 @@ export class Client extends Emitter<ClientEvents> {
 		});
 
 		// Respawn handling
+		if (!this.options.autoRespawn) return;
+
 		this.on("ActorEventPacket", async (packet: ActorEventPacket) => {
 			if (
 				packet.actorRuntimeId !== this.startGameData.runtimeEntityId ||

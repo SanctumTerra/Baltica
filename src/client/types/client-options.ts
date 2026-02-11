@@ -66,6 +66,8 @@ export type ClientOptions = {
 	};
 	/** Whether to log the auth messages */
 	authLogs: boolean;
+	/** Whether to automatically respawn on death */
+	autoRespawn: boolean;
 };
 
 /** Default Client Options */
@@ -116,4 +118,6 @@ export const defaultClientOptions: ClientOptions = {
 	debug: false,
 	/** Default Value: true */
 	authLogs: true,
+	/** Default Value: true */
+	autoRespawn: true,
 };
