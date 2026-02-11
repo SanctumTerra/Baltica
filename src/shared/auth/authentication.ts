@@ -115,11 +115,6 @@ export async function authenticateWithCredentials(
 	options: AuthOptions,
 ): Promise<BedrockTokens> {
 	const { email, password, clientPublicKey, cacheDir, proxy } = options;
-
-	//cacheDir is always string (default "tokens" or cache factory)
-	//if string use FileCache factory otherwise use passed cache factory
-	
-
 	const proxiedFetch = createProxiedFetch(proxy);
 
 	// Verify proxy is working by checking our IP
