@@ -1,4 +1,5 @@
 import { CompressionMethod, DeviceOS, InputMode } from "@serenityjs/protocol";
+import type { CacheFactory } from "prismarine-auth";
 import type { SkinData } from "./payload";
 
 type LoginPacketOptions = {
@@ -31,8 +32,8 @@ export type ClientOptions = {
 	username: string;
 	/** Whether to use a worker(for Raknet) or not. */
 	worker: boolean;
-	/** Location of the tokens folder. */
-	tokensFolder: string;
+	/** Location of the tokens folder or a cache factory function for prismarine-auth. */
+	tokensFolder: string | CacheFactory;
 	/** Skin Data for custom skins (By default we parse it from json)*/
 	skinData: SkinData | undefined;
 	/** Path to PNG skin file (alternative to skinData) */

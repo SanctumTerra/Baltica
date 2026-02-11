@@ -16,6 +16,9 @@ import {
 	type RequestInit as UndiciRequestInit,
 } from "undici";
 
+import type { CacheFactory } from "prismarine-auth";
+import { FileCache } from "../cache/Filecache";
+
 export interface BedrockTokens {
 	chains: string[];
 	xuid: string;
@@ -37,7 +40,7 @@ export interface AuthOptions {
 	email: string;
 	password: string;
 	clientPublicKey: string;
-	cacheDir?: string;
+	cacheDir: string | CacheFactory;
 	proxy?: ProxyOptions;
 }
 
@@ -81,48 +84,6 @@ function ensureDir(dir: string): void {
 	}
 }
 
-function getCacheFile(cacheDir: string, email: string): string {
-	return path.join(cacheDir, `${hashString(email)}_xbl-user-cache.json`);
-}
-
-function loadCache(cacheFile: string): CachedAuth | null {
-	try {
-		if (fs.existsSync(cacheFile)) {
-			const cached = JSON.parse(
-				fs.readFileSync(cacheFile, "utf-8"),
-			) as CachedAuth;
-			const expiresAt = new Date(cached.notAfter).getTime();
-			if (Date.now() < expiresAt - 3600000) {
-				return cached;
-			}
-			Logger.info("Cached user token expired");
-		}
-	} catch {
-		/* ignore */
-	}
-	return null;
-}
-
-function saveCache(
-	cacheFile: string,
-	userToken: string,
-	userHash: string,
-	notAfter: string,
-): void {
-	try {
-		ensureDir(path.dirname(cacheFile));
-		const data: CachedAuth = {
-			userToken,
-			userHash,
-			notAfter,
-			obtainedOn: Date.now(),
-		};
-		fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));
-	} catch {
-		/* ignore */
-	}
-}
-
 function createProxiedFetch(proxy?: ProxyOptions): ProxiedFetch {
 	if (!proxy) {
 		return fetch;
@@ -154,7 +115,11 @@ export async function authenticateWithCredentials(
 	options: AuthOptions,
 ): Promise<BedrockTokens> {
 	const { email, password, clientPublicKey, cacheDir, proxy } = options;
-	const cacheFile = cacheDir ? getCacheFile(cacheDir, email) : null;
+
+	//cacheDir is always string (default "tokens" or cache factory)
+	//if string use FileCache factory otherwise use passed cache factory
+	
+
 	const proxiedFetch = createProxiedFetch(proxy);
 
 	// Verify proxy is working by checking our IP
@@ -173,8 +138,12 @@ export async function authenticateWithCredentials(
 	let userToken: string;
 	let userHash: string;
 
-	const cached = cacheFile ? loadCache(cacheFile) : null;
-	if (cached) {
+	const xblUserCache = typeof cacheDir === "string" 
+		? new FileCache(path.join(cacheDir, `${hashString(email)}_xbl-user-cache.json`)) 
+		: cacheDir({ username: email, cacheName: "_xbl-user-cache" });
+	const cached = await xblUserCache.getCached() as CachedAuth | undefined;
+	
+	if (cached?.userToken && cached?.notAfter && new Date(cached.notAfter) > new Date()) {
 		Logger.info("Using cached Xbox user token...");
 		userToken = cached.userToken;
 		userHash = cached.userHash;
@@ -196,9 +165,13 @@ export async function authenticateWithCredentials(
 		userToken = userTokenResp.Token;
 		userHash = userTokenResp.DisplayClaims.xui[0].uhs;
 
-		if (cacheFile) {
-			saveCache(cacheFile, userToken, userHash, userTokenResp.NotAfter);
-		}
+		// Cache the user token for future use
+		await xblUserCache.setCached({
+			userToken,
+			userHash,
+			notAfter: userTokenResp.NotAfter,
+			obtainedOn: Date.now(),
+		} as CachedAuth);
 	}
 
 	// Get XSTS token for Minecraft Bedrock
