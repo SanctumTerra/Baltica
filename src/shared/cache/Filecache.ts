@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Cache } from 'prismarine-auth'  
 
 //prismarine-auth uses 'any' instead of 'Record<string, unknown>' but fails linting
@@ -13,6 +14,10 @@ export class FileCache implements Cache {
 
   async reset(): Promise<void> {
     this.cache = {}
+    const dir = path.dirname(this.cacheLocation)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
     fs.writeFileSync(this.cacheLocation, JSON.stringify(this.cache))
   }
 
@@ -34,6 +39,10 @@ export class FileCache implements Cache {
 
   async setCached(cached: Record<string, unknown>): Promise<void> {
     this.cache = cached
+    const dir = path.dirname(this.cacheLocation)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
     fs.writeFileSync(this.cacheLocation, JSON.stringify(this.cache))
   }
 
