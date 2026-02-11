@@ -11,6 +11,7 @@ export enum ProtocolList {
 	"1.21.113" = 844,
 	"1.21.120" = 859,
 	"1.21.130" = 898,
+	"26.0" = 924,
 }
 
 export type PacketNames = {
@@ -24,8 +25,8 @@ export type PacketNames = {
 /**
  * We do not have multi protocol as of now (Not yet planned either).
  */
-export type CurrentVersion = "1.21.130";
-export const CurrentVersionConst: CurrentVersion = "1.21.130";
+export type CurrentVersion = "26.0";
+export const CurrentVersionConst: CurrentVersion = "26.0";
 
 /**
  * Checks if client version is higher than the specified version
