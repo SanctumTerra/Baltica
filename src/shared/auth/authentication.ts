@@ -42,6 +42,7 @@ export interface AuthOptions {
 	clientPublicKey: string;
 	cacheDir: string | CacheFactory;
 	proxy?: ProxyOptions;
+	authLogs?: boolean;
 }
 
 interface CachedAuth {
@@ -114,7 +115,14 @@ function createProxiedFetch(proxy?: ProxyOptions): ProxiedFetch {
 export async function authenticateWithCredentials(
 	options: AuthOptions,
 ): Promise<BedrockTokens> {
-	const { email, password, clientPublicKey, cacheDir, proxy } = options;
+	const {
+		email,
+		password,
+		clientPublicKey,
+		cacheDir,
+		proxy,
+		authLogs = true,
+	} = options;
 	const proxiedFetch = createProxiedFetch(proxy);
 
 	// Verify proxy is working by checking our IP
@@ -122,7 +130,7 @@ export async function authenticateWithCredentials(
 		try {
 			const ipResp = await proxiedFetch("https://api.ipify.org?format=json");
 			const ipData = (await ipResp.json()) as { ip: string };
-			Logger.info(`Proxy IP verified: ${ipData.ip}`);
+			if (authLogs) Logger.info(`Proxy IP verified: ${ipData.ip}`);
 		} catch (e) {
 			Logger.warn(
 				`Could not verify proxy IP: ${e instanceof Error ? e.message : String(e)}`,
@@ -133,13 +141,20 @@ export async function authenticateWithCredentials(
 	let userToken: string;
 	let userHash: string;
 
-	const xblUserCache = typeof cacheDir === "string" 
-		? new FileCache(path.join(cacheDir, `${hashString(email)}_xbl-user-cache.json`)) 
-		: cacheDir({ username: email, cacheName: "_xbl-user-cache" });
-	const cached = await xblUserCache.getCached() as CachedAuth | undefined;
-	
-	if (cached?.userToken && cached?.notAfter && new Date(cached.notAfter) > new Date()) {
-		Logger.info("Using cached Xbox user token...");
+	const xblUserCache =
+		typeof cacheDir === "string"
+			? new FileCache(
+					path.join(cacheDir, `${hashString(email)}_xbl-user-cache.json`),
+				)
+			: cacheDir({ username: email, cacheName: "_xbl-user-cache" });
+	const cached = (await xblUserCache.getCached()) as CachedAuth | undefined;
+
+	if (
+		cached?.userToken &&
+		cached?.notAfter &&
+		new Date(cached.notAfter) > new Date()
+	) {
+		if (authLogs) Logger.info("Using cached Xbox user token...");
 		userToken = cached.userToken;
 		userHash = cached.userHash;
 	} else {
@@ -193,7 +208,7 @@ export async function authenticateWithCredentials(
 	);
 	const gamertag = extractGamertagFromChains(chains);
 
-	Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
+	if (authLogs) Logger.info(`Authenticated as: ${gamertag} (${xuid})`);
 	return {
 		chains,
 		xuid,

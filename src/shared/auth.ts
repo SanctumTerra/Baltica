@@ -93,6 +93,7 @@ async function authenticateWithEmailPassword(client: Client): Promise<void> {
 			clientPublicKey: client.data.loginData.clientX509,
 			cacheDir: client.options.tokensFolder,
 			proxy: client.options.proxy,
+			authLogs: client.options.authLogs,
 		});
 
 		const profile: Profile = {

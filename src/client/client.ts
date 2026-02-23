@@ -51,7 +51,7 @@ import {
 	type ClientOptions,
 	defaultClientOptions,
 } from "./types";
-import { WorkerClient } from "./worker";
+import { RaknetWorker } from "./worker";
 
 /**
  * Client class represents a Minecraft Bedrock Edition client.
@@ -66,7 +66,7 @@ export class Client extends Emitter<ClientEvents> {
 	/** Client Options that change decisions duh. */
 	options: ClientOptions;
 	/** Raknet Connection (Normal or Worker) */
-	raknet: RaknetClient | WorkerClient;
+	raknet: RaknetClient | RaknetWorker;
 	/** Whether session is ready and we are set to go and connect. */
 	sessionReady: boolean;
 	/** Authentication profile */
@@ -109,7 +109,7 @@ export class Client extends Emitter<ClientEvents> {
 		this.status = ConnectionStatus.Disconnected;
 		/** worker or not. */
 		this.raknet = this.options.worker
-			? new WorkerClient({
+			? new RaknetWorker({
 					address: this.options.address,
 					port: this.options.port,
 					proxy: this.options.proxy,
@@ -431,7 +431,7 @@ export class Client extends Emitter<ClientEvents> {
 	/** Fully destroy the client and clean up all resources */
 	public destroy(): void {
 		this.cleanup();
-		if (this.raknet instanceof WorkerClient) {
+		if (this.raknet instanceof RaknetWorker) {
 			this.raknet.dispose();
 		} else {
 			// RaknetClient - call disconnect which should clean up internal timers

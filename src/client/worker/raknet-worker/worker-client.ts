@@ -10,7 +10,7 @@ import {
 import type { Worker } from "node:worker_threads";
 import { connect } from "./worker";
 
-class WorkerClient extends Emitter<ClientEvents> {
+class RaknetWorker extends Emitter<ClientEvents> {
 	private _worker: Worker | undefined;
 	private _options: ClientOptions;
 	private advertisement: Advertisement | undefined;
@@ -127,7 +127,7 @@ class WorkerClient extends Emitter<ClientEvents> {
 }
 
 // Example usage
-// const client = new WorkerClient({
+// const client = new RaknetWorker({
 //     address: "127.0.0.1",
 //     port: 19132
 // })
@@ -137,4 +137,4 @@ class WorkerClient extends Emitter<ClientEvents> {
 //     console.error(error);
 // });
 
-export { WorkerClient };
+export { RaknetWorker };

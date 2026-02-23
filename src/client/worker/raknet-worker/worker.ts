@@ -4,11 +4,18 @@ import {
 	Frame,
 	Logger,
 } from "@sanctumterra/raknet";
-import { Worker, isMainThread, parentPort } from "node:worker_threads";
+import {
+	Worker,
+	isMainThread,
+	parentPort,
+	workerData,
+} from "node:worker_threads";
 
 function connect(options: ClientOptions) {
 	if (isMainThread) {
-		const worker = new Worker(__filename);
+		const worker = new Worker(__filename, {
+			workerData: { type: "raknet-worker" },
+		});
 
 		worker.on("error", (error) => {
 			Logger.error(`Worker error: ${error.message}`);
@@ -107,7 +114,7 @@ function main() {
 	});
 }
 
-if (!isMainThread) {
+if (!isMainThread && workerData?.type === "raknet-worker") {
 	try {
 		main();
 	} catch (error) {
